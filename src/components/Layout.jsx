@@ -9,11 +9,12 @@ export default function Layout({ children }) {
   const { logout } = useAuth();
 
   const navItems = [
-    { name: "Dashboard", path: "/" },
+    { name: "Dashboard", path: "/dashboard" },
     { name: "Members", path: "/members" },
     { name: "Attendance", path: "/attendance" },
     { name: "Projects", path: "/projects" },
     { name: "Events", path: "/events" },
+    { name: "Leaderboard", path: "/leaderboard" },
   ];
 
   return (
@@ -38,9 +39,10 @@ export default function Layout({ children }) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex flex-col gap-2 p-4 font-medium overflow-y-auto">
+         <nav className="flex flex-col gap-2 p-4 font-medium">
             {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              
+              const isActive = location.pathname.startsWith(item.path);
 
               return (
                 <Link
@@ -59,6 +61,7 @@ export default function Layout({ children }) {
               );
             })}
           </nav>
+
         </div>
 
         {/* BOTTOM LOGOUT BUTTON */}

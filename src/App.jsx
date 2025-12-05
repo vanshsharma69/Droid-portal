@@ -14,6 +14,7 @@ import EventDetails from "./pages/EventDetails";
 
 import Login from "./pages/Login";
 import PrivateRoute from "./components/PrivateRoute";
+import Leaderboard from "./pages/Leaderboard";
 
 export default function App() {
   return (
@@ -23,7 +24,7 @@ export default function App() {
 
       {/* PROTECTED ROUTES */}
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <PrivateRoute>
             <Layout>
@@ -116,6 +117,16 @@ export default function App() {
           <PrivateRoute>
             <Layout>
               <EventDetails />
+            </Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/leaderboard"
+        element={
+          <PrivateRoute>
+            <Layout>
+              <Leaderboard />
             </Layout>
           </PrivateRoute>
         }

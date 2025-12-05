@@ -1,33 +1,46 @@
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useState } from "react";
+import { dailyAttendance } from "../Data/attendance";
+import { eventAttendance } from "../Data/attendance"; 
+import { events } from "../Data/events";
 
 export default function AttendanceDetails() {
   const { state } = useLocation();
-  const { user } = useAuth(); // detect role
-  const m = state?.m;
+  const { user } = useAuth();
 
-  if (!m) {
+  const member = state?.member;
+
+  if (!member) {
     return <h1 className="text-xl font-bold text-center mt-10">Member not found</h1>;
   }
 
-  // LOCAL STATE FOR EDITING
-  const [daily, setDaily] = useState([...m.attendance.daily]);
-  const [events, setEvents] = useState([...m.events]);
+  // FILTER DAILY ATTENDANCE FOR THIS MEMBER
+  const initialDaily = dailyAttendance.filter(d => d.memberId === member.id);
+
+  const initialEventAttendance = eventAttendance
+    .filter(e => e.memberId === member.id)
+    .map(e => ({
+      ...e,
+      name: events.find(evt => evt.id === e.eventId)?.name || "Unknown Event"
+    }));
+
+  const [daily, setDaily] = useState(initialDaily);
+  const [eventData, setEventData] = useState(initialEventAttendance);
 
   // SUMMARY
   const totalDays = daily.length;
-  const presentDays = daily.filter((d) => d.present).length;
+  const presentDays = daily.filter(d => d.present).length;
   const percent = totalDays ? Math.round((presentDays / totalDays) * 100) : 0;
 
   // ADD NEW DAILY ENTRY
   const addNewDay = () => {
-    const today = prompt("Enter date (YYYY-MM-DD):");
-    if (!today) return;
+    const date = prompt("Enter date (YYYY-MM-DD):");
+    if (!date) return;
 
     const present = confirm("Mark present? OK = Present, Cancel = Absent");
 
-    const newEntry = { date: today, present };
+    const newEntry = { memberId: member.id, date, present };
     setDaily([...daily, newEntry]);
   };
 
@@ -37,7 +50,7 @@ export default function AttendanceDetails() {
     setDaily(daily.filter((_, i) => i !== index));
   };
 
-  // TOGGLE PRESENT/ABSENT
+  // TOGGLE PRESENT
   const toggleDay = (index) => {
     const updated = [...daily];
     updated[index].present = !updated[index].present;
@@ -46,67 +59,66 @@ export default function AttendanceDetails() {
 
   // ADD EVENT ATTENDANCE
   const addNewEvent = () => {
-    const name = prompt("Enter event name:");
-    if (!name) return;
+    const eventId = Number(prompt("Enter Event ID:"));
+    if (!eventId) return;
+
+    const eventObj = events.find(e => e.id === eventId);
+    if (!eventObj) return alert("Event not found!");
 
     const attended = confirm("Mark attended? OK = Yes, Cancel = No");
 
     const newEvent = {
-      name,
-      attended,
-      eventId: Date.now()
+      memberId: member.id,
+      eventId,
+      name: eventObj.name,
+      attended
     };
 
-    setEvents([...events, newEvent]);
+    setEventData([...eventData, newEvent]);
   };
 
-  // DELETE EVENT
+  // DELETE EVENT ENTRY
   const deleteEvent = (index) => {
     if (!confirm("Delete this event attendance?")) return;
-    setEvents(events.filter((_, i) => i !== index));
+    setEventData(eventData.filter((_, i) => i !== index));
   };
 
-  // TOGGLE EVENT
+  // TOGGLE EVENT ATTENDANCE
   const toggleEvent = (index) => {
-    const updated = [...events];
+    const updated = [...eventData];
     updated[index].attended = !updated[index].attended;
-    setEvents(updated);
+    setEventData(updated);
   };
 
   return (
     <div className="max-w-6xl mx-auto py-10">
+
+      {/* PAGE HEADER */}
       <h1 className="text-3xl font-bold mb-8">Attendance Details</h1>
 
       {/* MEMBER CARD */}
       <div className="flex flex-col md:flex-row items-center gap-8 bg-white p-6 shadow rounded-lg mb-10">
-        <img
-          src={m.img}
-          alt={m.name}
-          className="w-36 h-36 rounded-full object-cover shadow-lg"
-        />
+        <img src={member.img} alt={member.name} className="w-36 h-36 rounded-full shadow" />
 
         <div>
-          <h2 className="text-2xl font-bold">{m.name}</h2>
-          <p className="text-gray-600">{m.role}</p>
+          <h2 className="text-2xl font-bold">{member.name}</h2>
+          <p className="text-gray-600">{member.role}</p>
 
           <div className="mt-4 text-gray-700 space-y-1">
-            <p><span className="font-semibold">Attendance %:</span> {percent}%</p>
-            <p><span className="font-semibold">Present:</span> {presentDays} days</p>
-            <p><span className="font-semibold">Absent:</span> {totalDays - presentDays} days</p>
+            <p><strong>Attendance %:</strong> {percent}%</p>
+            <p><strong>Present:</strong> {presentDays} days</p>
+            <p><strong>Absent:</strong> {totalDays - presentDays} days</p>
           </div>
         </div>
       </div>
 
       {/* DAILY ATTENDANCE */}
-      <div className="bg-white p-6 shadow rounded-lg mb-10">
+      <div className="bg-white p-6 rounded-lg shadow mb-10">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold">Daily Attendance</h3>
 
           {user?.role === "superadmin" && (
-            <button
-              onClick={addNewDay}
-              className="px-4 py-2 bg-black text-white rounded-lg"
-            >
+            <button onClick={addNewDay} className="px-4 py-2 bg-black text-white rounded-lg">
               + Add Day
             </button>
           )}
@@ -114,10 +126,7 @@ export default function AttendanceDetails() {
 
         <ul className="space-y-2">
           {daily.map((d, i) => (
-            <li 
-              key={i}
-              className="flex justify-between p-3 border rounded-md bg-gray-50 items-center"
-            >
+            <li key={i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
               <span>{d.date}</span>
 
               <div className="flex items-center gap-3">
@@ -127,18 +136,8 @@ export default function AttendanceDetails() {
 
                 {user?.role === "superadmin" && (
                   <>
-                    <button
-                      onClick={() => toggleDay(i)}
-                      className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded"
-                    >
-                      Toggle
-                    </button>
-                    <button
-                      onClick={() => deleteDay(i)}
-                      className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded"
-                    >
-                      Delete
-                    </button>
+                    <button onClick={() => toggleDay(i)} className="text-blue-600 text-xs">Toggle</button>
+                    <button onClick={() => deleteDay(i)} className="text-red-600 text-xs">Delete</button>
                   </>
                 )}
               </div>
@@ -148,29 +147,23 @@ export default function AttendanceDetails() {
       </div>
 
       {/* EVENT ATTENDANCE */}
-      <div className="bg-white p-6 shadow rounded-lg">
+      <div className="bg-white p-6 rounded-lg shadow">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold">Event Attendance</h3>
 
           {user?.role === "superadmin" && (
-            <button
-              onClick={addNewEvent}
-              className="px-4 py-2 bg-black text-white rounded-lg"
-            >
+            <button onClick={addNewEvent} className="px-4 py-2 bg-black text-white rounded-lg">
               + Add Event
             </button>
           )}
         </div>
 
-        {events.length === 0 ? (
+        {eventData.length === 0 ? (
           <p className="text-gray-500">No event attendance recorded.</p>
         ) : (
           <ul className="space-y-2">
-            {events.map((e, i) => (
-              <li 
-                key={i}
-                className="flex justify-between p-3 border rounded-md bg-gray-50 items-center"
-              >
+            {eventData.map((e, i) => (
+              <li key={i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
                 <span>{e.name}</span>
 
                 <div className="flex items-center gap-3">
@@ -180,18 +173,8 @@ export default function AttendanceDetails() {
 
                   {user?.role === "superadmin" && (
                     <>
-                      <button
-                        onClick={() => toggleEvent(i)}
-                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded"
-                      >
-                        Toggle
-                      </button>
-                      <button
-                        onClick={() => deleteEvent(i)}
-                        className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded"
-                      >
-                        Delete
-                      </button>
+                      <button onClick={() => toggleEvent(i)} className="text-blue-600 text-xs">Toggle</button>
+                      <button onClick={() => deleteEvent(i)} className="text-red-600 text-xs">Delete</button>
                     </>
                   )}
                 </div>

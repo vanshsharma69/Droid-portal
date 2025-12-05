@@ -1,33 +1,46 @@
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+// import { useMembers } from "../context/MembersContext";
 import { useState } from "react";
-import { members } from "../Data/members";
 
 export default function ProjectDetails() {
   const { state } = useLocation();
   const { user } = useAuth();
+  const { members, updateMember } = useMembers();
+
   const p = state?.project;
 
   if (!p) return <h1 className="text-xl font-bold">Project not found</h1>;
 
-  // Local state for editing
   const [project, setProject] = useState({ ...p });
   const [editMode, setEditMode] = useState(false);
 
-  // Update field
+  // Save changes BACK to global members list
+  const saveProject = () => {
+    members.forEach((m) => {
+      const index = m.projects.findIndex((pr) => pr.projectId === project.projectId);
+      if (index !== -1) {
+        const updatedProjects = [...m.projects];
+        updatedProjects[index] = project;
+        updateMember(m.id, { projects: updatedProjects });
+      }
+    });
+
+    alert("Project updated successfully!");
+    setEditMode(false);
+  };
+
   const update = (field, value) => {
     setProject({ ...project, [field]: value });
   };
 
-  // BUGS CRUD
+  // BUG CRUD
   const addBug = () => {
     const title = prompt("Bug title?");
     if (!title) return;
+
     const bug = { bugId: Date.now(), title, status: "Open" };
-    setProject({
-      ...project,
-      bugs: [...project.bugs, bug]
-    });
+    setProject({ ...project, bugs: [...project.bugs, bug] });
   };
 
   const toggleBugStatus = (index) => {
@@ -38,9 +51,10 @@ export default function ProjectDetails() {
 
   const deleteBug = (index) => {
     if (!confirm("Delete this bug?")) return;
+
     setProject({
       ...project,
-      bugs: project.bugs.filter((_, i) => i !== index)
+      bugs: project.bugs.filter((_, i) => i !== index),
     });
   };
 
@@ -48,9 +62,12 @@ export default function ProjectDetails() {
   const addFeedback = () => {
     const by = prompt("Feedback by:");
     if (!by) return;
+
     const text = prompt("Feedback message:");
     if (!text) return;
-    const stars = Number(prompt("Rating (1-5):"));
+
+    const stars = Number(prompt("Stars (1-5)?"));
+    if (!stars) return;
 
     const fb = { by, text, stars };
     setProject({ ...project, feedback: [...project.feedback, fb] });
@@ -58,43 +75,39 @@ export default function ProjectDetails() {
 
   const deleteFeedback = (index) => {
     if (!confirm("Delete feedback?")) return;
+
     setProject({
       ...project,
-      feedback: project.feedback.filter((_, i) => i !== index)
+      feedback: project.feedback.filter((_, i) => i !== index),
     });
   };
 
   // MEMBER ASSIGNMENT CRUD
+  const unassigned = members.filter(
+    (m) => !project.assignedMembers.some((am) => am.id === m.id)
+  );
+
   const assignMember = () => {
-    const available = members.filter(
-      (m) => !project.assignedMembers.some((am) => am.id === m.id)
-    );
+    const names = unassigned.map((m) => m.name).join("\n");
+    const selected = prompt("Assign member:\n\n" + names);
 
-    if (available.length === 0) {
-      alert("No more members to assign");
-      return;
-    }
-
-    const names = available.map((m) => m.name).join("\n");
-    const selected = prompt(
-      "Select a member to assign:\n\n" + names
-    );
     if (!selected) return;
 
-    const found = available.find((m) => m.name === selected);
-    if (!found) return alert("Invalid name");
+    const mem = unassigned.find((m) => m.name === selected);
+    if (!mem) return alert("Invalid member name");
 
     setProject({
       ...project,
-      assignedMembers: [...project.assignedMembers, found]
+      assignedMembers: [...project.assignedMembers, mem],
     });
   };
 
   const removeMember = (id) => {
-    if (!confirm("Remove member from this project?")) return;
+    if (!confirm("Remove member?")) return;
+
     setProject({
       ...project,
-      assignedMembers: project.assignedMembers.filter((m) => m.id !== id)
+      assignedMembers: project.assignedMembers.filter((m) => m.id !== id),
     });
   };
 
@@ -107,7 +120,7 @@ export default function ProjectDetails() {
 
         {user?.role === "superadmin" && (
           <button
-            onClick={() => setEditMode(!editMode)}
+            onClick={() => (editMode ? saveProject() : setEditMode(true))}
             className="px-4 py-2 bg-black text-white rounded-lg"
           >
             {editMode ? "Save Changes" : "Edit Project"}
@@ -115,10 +128,9 @@ export default function ProjectDetails() {
         )}
       </div>
 
-      {/* MAIN CARD */}
       <div className="bg-white p-6 rounded-lg shadow">
 
-        {/* PROJECT NAME */}
+        {/* NAME */}
         {!editMode ? (
           <h2 className="text-3xl font-bold">{project.name}</h2>
         ) : (
@@ -141,7 +153,7 @@ export default function ProjectDetails() {
         )}
 
         {/* STATUS + DEADLINE */}
-        <div className="mt-6 space-y-2 text-lg">
+        <div className="mt-6 text-lg space-y-2">
           <p>
             <span className="font-semibold">Status:</span>{" "}
             {!editMode ? (
@@ -166,7 +178,7 @@ export default function ProjectDetails() {
             ) : (
               <input
                 type="date"
-                className="border p-1 rounded"
+                className="border p-2 rounded"
                 value={project.deadline}
                 onChange={(e) => update("deadline", e.target.value)}
               />
@@ -174,16 +186,13 @@ export default function ProjectDetails() {
           </p>
         </div>
 
-        {/* BUGS SECTION */}
+        {/* BUGS */}
         <div className="mt-10">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between">
             <h3 className="text-2xl font-semibold">Bugs</h3>
 
             {user?.role === "superadmin" && (
-              <button
-                onClick={addBug}
-                className="px-3 py-1 bg-black text-white rounded"
-              >
+              <button onClick={addBug} className="px-3 py-1 bg-black text-white rounded">
                 + Add Bug
               </button>
             )}
@@ -191,20 +200,10 @@ export default function ProjectDetails() {
 
           <ul className="mt-4 space-y-3">
             {project.bugs.map((b, i) => (
-              <li
-                key={b.bugId}
-                className="p-4 border rounded flex justify-between items-center"
-              >
+              <li key={b.bugId} className="p-4 border rounded flex justify-between">
                 <span>{b.title}</span>
-
                 <div className="flex gap-3 items-center">
-                  <span
-                    className={
-                      b.status === "Open"
-                        ? "text-red-600 font-semibold"
-                        : "text-green-600 font-semibold"
-                    }
-                  >
+                  <span className={b.status === "Open" ? "text-red-600" : "text-green-600"}>
                     {b.status}
                   </span>
 
@@ -212,13 +211,14 @@ export default function ProjectDetails() {
                     <>
                       <button
                         onClick={() => toggleBugStatus(i)}
-                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded"
+                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
                       >
                         Toggle
                       </button>
+
                       <button
                         onClick={() => deleteBug(i)}
-                        className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded"
+                        className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs"
                       >
                         Delete
                       </button>
@@ -230,16 +230,13 @@ export default function ProjectDetails() {
           </ul>
         </div>
 
-        {/* FEEDBACK SECTION */}
+        {/* FEEDBACK */}
         <div className="mt-10">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between">
             <h3 className="text-2xl font-semibold">Feedback</h3>
 
             {user?.role === "superadmin" && (
-              <button
-                onClick={addFeedback}
-                className="px-3 py-1 bg-black text-white rounded"
-              >
+              <button onClick={addFeedback} className="px-3 py-1 bg-black text-white rounded">
                 + Add Feedback
               </button>
             )}
@@ -247,15 +244,15 @@ export default function ProjectDetails() {
 
           <ul className="mt-4 space-y-3">
             {project.feedback.map((fb, i) => (
-              <li key={i} className="p-4 border rounded">
+              <li className="p-4 border rounded" key={i}>
                 <p className="font-semibold">{fb.by}</p>
-                <p className="text-gray-600">{fb.text}</p>
-                <p className="text-yellow-600 font-semibold">⭐ {fb.stars}</p>
+                <p>{fb.text}</p>
+                <p className="text-yellow-600">⭐ {fb.stars}</p>
 
                 {user?.role === "superadmin" && (
                   <button
                     onClick={() => deleteFeedback(i)}
-                    className="mt-2 px-2 py-1 text-xs bg-red-100 text-red-700 rounded"
+                    className="mt-2 px-2 py-1 bg-red-100 text-red-700 text-xs rounded"
                   >
                     Delete
                   </button>
@@ -265,16 +262,13 @@ export default function ProjectDetails() {
           </ul>
         </div>
 
-        {/* ASSIGNED MEMBERS */}
+        {/* MEMBER ASSIGNMENT */}
         <div className="mt-10">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between">
             <h3 className="text-2xl font-semibold">Assigned Members</h3>
 
             {user?.role === "superadmin" && (
-              <button
-                onClick={assignMember}
-                className="px-3 py-1 bg-black text-white rounded"
-              >
+              <button onClick={assignMember} className="px-3 py-1 bg-black text-white rounded">
                 + Assign Member
               </button>
             )}
@@ -282,14 +276,8 @@ export default function ProjectDetails() {
 
           <ul className="mt-4 space-y-3">
             {project.assignedMembers.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center gap-3 p-4 border rounded"
-              >
-                <img
-                  src={m.img}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
+              <li key={m.id} className="flex items-center gap-3 p-4 border rounded">
+                <img src={m.img} className="w-12 h-12 rounded-full" />
 
                 <div>
                   <p className="font-semibold">{m.name}</p>

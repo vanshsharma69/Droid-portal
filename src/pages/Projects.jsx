@@ -1,9 +1,10 @@
-import { members } from "../Data/members";
 import { Link } from "react-router-dom";
 import { FolderKanban, Clock } from "lucide-react";
+// import { useMembers } from "../context/MembersContext";
 
 export default function Projects() {
-  // Extract all unique projects
+  const { members } = useMembers();  // <-- GLOBAL members
+
   const allProjects = [];
 
   members.forEach((m) => {
@@ -13,15 +14,15 @@ export default function Projects() {
       if (!exists) {
         allProjects.push({
           ...p,
-          assignedMembers: [m],  // first member
+          assignedMembers: [m],
         });
       } else {
-        exists.assignedMembers.push(m);  // push additional member
+        exists.assignedMembers.push(m);
       }
     });
   });
 
-  // Badge styling
+  // Badge colors
   const statusBadge = (status) => {
     if (status === "Completed")
       return "bg-green-100 text-green-700 border-green-300";
@@ -44,14 +45,13 @@ export default function Projects() {
             className="block"
           >
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 
-              hover:shadow-xl hover:scale-[1.01] transition-all cursor-pointer">
+                hover:shadow-xl hover:scale-[1.01] transition-all cursor-pointer">
 
-              {/* Top: Icon + Title */}
+              {/* Icon + Title */}
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-gray-100 rounded-full">
                   <FolderKanban className="w-6 h-6 text-gray-700" />
                 </div>
-
                 <h2 className="text-xl font-semibold">{p.name}</h2>
               </div>
 
@@ -71,18 +71,16 @@ export default function Projects() {
                   <Clock className="w-4 h-4" />
                   <span className="text-sm">
                     Deadline:{" "}
-                    <span className="font-semibold text-black">
-                      {p.deadline}
-                    </span>
+                    <span className="font-semibold text-black">{p.deadline}</span>
                   </span>
                 </div>
 
-                {/* Assigned Members */}
+                {/* Members count */}
                 <p className="text-sm text-gray-700 mt-3 font-medium">
                   Members Assigned: {p.assignedMembers.length}
                 </p>
 
-                {/* Member Avatars */}
+                {/* Avatars */}
                 <div className="flex mt-2 -space-x-3">
                   {p.assignedMembers.slice(0, 3).map((m, i) => (
                     <img

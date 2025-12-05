@@ -1,6 +1,7 @@
-import { members } from "../Data/members";
 import { Link } from "react-router-dom";
-import { CheckCircle, XCircle, BarChart3 } from "lucide-react";
+import { members } from "../Data/members";
+import { dailyAttendance } from "../Data/attendance"; 
+import { BarChart3 } from "lucide-react";
 
 export default function Attendance() {
   return (
@@ -13,25 +14,27 @@ export default function Attendance() {
           Member Attendance Overview
         </h2>
 
-        {/* Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-
           {members.map((m) => {
-            const total = m.attendance.daily.length;
-            const present = m.attendance.daily.filter(a => a.present).length;
-            const percent = total > 0 ? ((present / total) * 100).toFixed(0) : 0;
+            // Filter attendance belonging to this member
+            const memberDaily = dailyAttendance.filter(a => a.memberId === m.id);
+
+            const total = memberDaily.length;
+            const present = memberDaily.filter(a => a.present).length;
+
+            const percent = total ? Math.round((present / total) * 100) : 0;
 
             return (
               <Link
                 key={m.id}
                 to={`/attendance/${m.id}`}
-                state={{ m }}
+                state={{ member: m }} // only pass member profile
                 className="block"
               >
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200
-                  hover:shadow-lg hover:scale-[1.01] transition-all cursor-pointer">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 
+                    hover:shadow-lg hover:scale-[1.01] transition-all cursor-pointer">
 
-                  {/* Top: Member */}
+                  {/* HEADER: User */}
                   <div className="flex items-center gap-4">
                     <img
                       src={m.img}
@@ -43,11 +46,12 @@ export default function Attendance() {
                     </div>
                   </div>
 
-                  {/* Attendance Stats */}
+                  {/* ATTENDANCE SECTION */}
                   <div className="mt-5 space-y-2 text-gray-700 text-sm">
 
                     {/* Percentage Badge */}
-                    <div className="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-800 border border-gray-300">
+                    <div className="inline-block px-3 py-1 rounded-full text-sm font-semibold 
+                        bg-gray-100 text-gray-800 border border-gray-300">
                       {percent}% Attendance
                     </div>
 
@@ -67,14 +71,11 @@ export default function Attendance() {
                     </div>
 
                   </div>
-
                 </div>
               </Link>
             );
           })}
-
         </div>
-
       </div>
     </div>
   );

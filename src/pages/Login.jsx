@@ -16,7 +16,7 @@ export default function Login() {
     const res = login(email, password);
 
     if (res.success) {
-      navigate("/"); // redirect to dashboard
+      navigate("/dashboard");
     } else {
       setError(res.message);
     }
