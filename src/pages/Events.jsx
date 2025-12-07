@@ -1,35 +1,84 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { events } from "../Data/events";
-import { eventAttendance } from "../Data/attendance";
-import { members } from "../Data/members";
 import { CalendarDays } from "lucide-react";
+import { useMembers } from "../context/MembersContext";
+import { useEvents } from "../context/EventsContext";
+import { useAttendance } from "../context/AttendanceContext";
+import { useAuth } from "../context/AuthContext";
+import Modal from "../components/Modal";
 
 export default function Events() {
-  
-  // Combine events + assigned members + attendance
-  const eventList = events.map((ev) => {
-    // Find all attendance records for this event
-    const assignedMembers = eventAttendance
-      .filter(a => a.eventId === ev.id)
-      .map(a => {
-        const member = members.find(m => m.id === a.memberId);
-        return {
-          ...member,
-          attended: a.attended
-        };
-      });
+  const { user } = useAuth();
+  const { members } = useMembers();
+  const { events, loading, error, refresh, createEvent } = useEvents();
+  const { eventAttendance, refreshEventAttendance } = useAttendance();
 
-    return {
-      ...ev,
-      assignedMembers
-    };
-  });
+  const [showAdd, setShowAdd] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ name: "", description: "", date: "", venue: "" });
+
+  useEffect(() => {
+    refresh();
+    refreshEventAttendance();
+  }, [refresh, refreshEventAttendance]);
+
+  const eventList = useMemo(() => {
+    return events.map((ev) => {
+      const eid = ev.eventId ?? ev.id ?? ev._id;
+      const assignedMembers = eventAttendance
+        .filter((a) => String(a.eventId) === String(eid))
+        .map((a) => {
+          const member = members.find((m) => String(m.memberId ?? m.id) === String(a.memberId));
+          return { ...a, member };
+        })
+        .filter((a) => a.member);
+
+      return {
+        ...ev,
+        eventId: eid,
+        assignedMembers,
+      };
+    });
+  }, [events, eventAttendance, members]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!form.name || !form.date || !form.venue) return alert("Name, date, and venue are required");
+    try {
+      setBusy(true);
+      await createEvent({
+        ...form,
+        assignedMembers: Array.isArray(form.assignedMembers)
+          ? form.assignedMembers.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
+          : [],
+      });
+      setForm({ name: "", description: "", date: "", venue: "" });
+      setShowAdd(false);
+    } catch (err) {
+      alert(err?.message || "Failed to create event");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6">Events</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Events</h1>
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-4 py-2 bg-black text-white rounded-lg shadow hover:opacity-80 transition"
+          >
+            + Add Event
+          </button>
+        )}
+      </div>
 
-      {eventList.length === 0 ? (
+      {loading && <p className="text-gray-600">Loading events...</p>}
+      {error && <p className="text-red-600">{error}</p>}
+
+      {eventList.length === 0 && !loading ? (
         <p className="text-gray-600">No events found.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
@@ -37,7 +86,7 @@ export default function Events() {
           {eventList.map((ev) => (
             <Link
               key={ev.id}
-              to={`/events/${ev.id}`}
+              to={`/events/${ev.eventId ?? ev.id ?? ev._id}`}
               state={{ event: ev }}
               className="block"
             >
@@ -61,8 +110,13 @@ export default function Events() {
                   </p>
 
                   <p>
-                    <span className="font-semibold">Event Type:</span>{" "}
-                    {ev.type || "General"}
+                    <span className="font-semibold">Date:</span>{" "}
+                    {ev.date}
+                  </p>
+
+                  <p>
+                    <span className="font-semibold">Venue:</span>{" "}
+                    {ev.venue || "TBD"}
                   </p>
                 </div>
 
@@ -71,7 +125,7 @@ export default function Events() {
                   {ev.assignedMembers.slice(0, 3).map((m, i) => (
                     <img
                       key={i}
-                      src={m.img}
+                      src={m.member?.img}
                       className="w-10 h-10 rounded-full border-2 border-white shadow"
                     />
                   ))}
@@ -89,6 +143,68 @@ export default function Events() {
 
         </div>
       )}
+
+      <Modal
+        open={showAdd}
+        title="Add Event"
+        onClose={() => setShowAdd(false)}
+        footer={(
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setShowAdd(false)} type="button" className="px-4 py-2 rounded border">
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={busy}
+              type="button"
+              className="px-4 py-2 rounded bg-black text-white disabled:opacity-60"
+            >
+              {busy ? "Creating..." : "Create"}
+            </button>
+          </div>
+        )}
+      >
+        <form className="space-y-3" onSubmit={handleCreate}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <input
+              className="w-full rounded-lg border p-2"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              className="w-full rounded-lg border p-2"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Date</label>
+              <input
+                type="date"
+                className="w-full rounded-lg border p-2"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Venue</label>
+              <input
+                className="w-full rounded-lg border p-2"
+                value={form.venue}
+                onChange={(e) => setForm({ ...form, venue: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -1,32 +1,29 @@
-import { members } from "../Data/members";
-import { events } from "../Data/events";
-import { projects } from "../Data/projects";
-import { dailyAttendance, eventAttendance } from "../Data/attendance";
+import { useMembers } from "../context/MembersContext";
+import { useProjects } from "../context/ProjectsContext";
+import { useEvents } from "../context/EventsContext";
+import { useAttendance } from "../context/AttendanceContext";
 
 export default function Dashboard() {
-  // TOTAL MEMBERS
+  const { members, loading: membersLoading } = useMembers();
+  const { projects, loading: projectsLoading } = useProjects();
+  const { events, loading: eventsLoading, error: eventsError } = useEvents();
+  const { daily, loading: attendanceLoading, error: attendanceError } = useAttendance();
+
   const totalMembers = members.length;
-
-  // TOTAL PROJECTS
   const totalProjects = projects.length;
-
-  // TOTAL EVENTS
   const totalEvents = events.length;
 
-  // AVG ATTENDANCE (daily)
   const avgAttendance = (() => {
-    const totalDays = dailyAttendance.length;
-    const presentDays = dailyAttendance.filter((a) => a.present).length;
-
+    const totalDays = daily.length;
+    const presentDays = daily.filter((a) => a.present).length;
     if (totalDays === 0) return 0;
     return Math.round((presentDays / totalDays) * 100);
   })();
 
-  // TOP MEMBER BASED ON POINTS
-  const topMember = [...members].sort((a, b) => b.points - a.points)[0];
-
-  // UPCOMING EVENTS (show first 3)
-  const upcomingEvents = events.slice(0, 3);
+  const topMember = [...members].sort((a, b) => (b.points || 0) - (a.points || 0))[0];
+  const upcomingEvents = [...events]
+    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))
+    .slice(0, 3);
 
   return (
     <div className="text-black">
@@ -61,23 +58,33 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {(membersLoading || projectsLoading || eventsLoading || attendanceLoading) && (
+        <p className="text-gray-600 mt-4">Loading dashboard data...</p>
+      )}
+      {(eventsError || attendanceError) && (
+        <p className="text-red-600 mt-2">{eventsError || attendanceError}</p>
+      )}
+
       {/* TOP MEMBER */}
       <div className="mt-10 bg-white p-6 rounded-xl shadow border">
         <h2 className="text-2xl font-semibold mb-4">Top Member</h2>
-
-        <div className="flex items-center gap-6">
-          <img
-            src={topMember.img}
-            className="w-20 h-20 rounded-full object-cover shadow"
-          />
-          <div>
-            <p className="text-xl font-bold">{topMember.name}</p>
-            <p className="text-gray-600">{topMember.role}</p>
-            <p className="mt-1 text-gray-700">
-              Points: <span className="font-semibold">{topMember.points}</span>
-            </p>
+        {topMember ? (
+          <div className="flex items-center gap-6">
+            <img
+              src={topMember.img}
+              className="w-20 h-20 rounded-full object-cover shadow"
+            />
+            <div>
+              <p className="text-xl font-bold">{topMember.name}</p>
+              <p className="text-gray-600">{topMember.role}</p>
+              <p className="mt-1 text-gray-700">
+                Points: <span className="font-semibold">{topMember.points}</span>
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="text-gray-600">No members available.</p>
+        )}
       </div>
 
       {/* UPCOMING EVENTS */}

@@ -1,93 +1,106 @@
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useState } from "react";
-import { dailyAttendance } from "../Data/attendance";
-import { eventAttendance } from "../Data/attendance"; 
-import { events } from "../Data/events";
+import Modal from "../components/Modal";
+import { useAttendance } from "../context/AttendanceContext";
+import { useEvents } from "../context/EventsContext";
+
+const normalizeMember = (m) => {
+  if (!m) return m;
+  const id = m.id || m._id;
+  return { ...m, id };
+};
 
 export default function AttendanceDetails() {
   const { state } = useLocation();
   const { user } = useAuth();
+  const {
+    daily,
+    eventAttendance,
+    loading,
+    error,
+    createDaily,
+    updateDaily,
+    deleteDaily,
+    createEventAtt,
+    updateEventAtt,
+    deleteEventAtt,
+  } = useAttendance();
+  const { events, loading: eventsLoading, error: eventsError } = useEvents();
+  const eventsList = events || [];
 
-  const member = state?.member;
+  const member = normalizeMember(state?.member);
 
   if (!member) {
     return <h1 className="text-xl font-bold text-center mt-10">Member not found</h1>;
   }
 
-  // FILTER DAILY ATTENDANCE FOR THIS MEMBER
-  const initialDaily = dailyAttendance.filter(d => d.memberId === member.id);
+  const memberKey = member.memberId ?? member.id;
+  const memberDaily = (daily || []).filter((d) => String(d.memberId) === String(memberKey));
+  const memberEventAttendance = (eventAttendance || []).filter(
+    (e) => String(e.memberId) === String(memberKey)
+  );
 
-  const initialEventAttendance = eventAttendance
-    .filter(e => e.memberId === member.id)
-    .map(e => ({
-      ...e,
-      name: events.find(evt => evt.id === e.eventId)?.name || "Unknown Event"
-    }));
-
-  const [daily, setDaily] = useState(initialDaily);
-  const [eventData, setEventData] = useState(initialEventAttendance);
+  const [showDay, setShowDay] = useState(false);
+  const [showEvent, setShowEvent] = useState(false);
+  const [dayForm, setDayForm] = useState({ date: "", present: true });
+  const [eventForm, setEventForm] = useState({ eventId: "", attended: true });
 
   // SUMMARY
-  const totalDays = daily.length;
-  const presentDays = daily.filter(d => d.present).length;
+  const totalDays = memberDaily.length;
+  const presentDays = memberDaily.filter(d => d.present).length;
   const percent = totalDays ? Math.round((presentDays / totalDays) * 100) : 0;
 
-  // ADD NEW DAILY ENTRY
-  const addNewDay = () => {
-    const date = prompt("Enter date (YYYY-MM-DD):");
-    if (!date) return;
-
-    const present = confirm("Mark present? OK = Present, Cancel = Absent");
-
-    const newEntry = { memberId: member.id, date, present };
-    setDaily([...daily, newEntry]);
+  const addNewDay = async () => {
+    if (!dayForm.date) return alert("Date is required");
+    if (memberKey === undefined || memberKey === null) return alert("Missing member id");
+    await createDaily({ memberId: Number(memberKey), date: dayForm.date, present: dayForm.present });
+    setDayForm({ date: "", present: true });
+    setShowDay(false);
   };
 
-  // DELETE DAY
   const deleteDay = (index) => {
+    const entry = memberDaily[index];
+    if (!entry) return;
     if (!confirm("Delete this entry?")) return;
-    setDaily(daily.filter((_, i) => i !== index));
+    deleteDaily(entry.id);
   };
 
   // TOGGLE PRESENT
   const toggleDay = (index) => {
-    const updated = [...daily];
-    updated[index].present = !updated[index].present;
-    setDaily(updated);
+    const entry = memberDaily[index];
+    if (!entry?.id) return;
+    updateDaily(entry.id, { present: !entry.present });
   };
 
-  // ADD EVENT ATTENDANCE
-  const addNewEvent = () => {
-    const eventId = Number(prompt("Enter Event ID:"));
-    if (!eventId) return;
+  const addNewEvent = async () => {
+    const eventIdNum = Number(eventForm.eventId);
+    const eventObj = eventsList.find((e) => Number(e.id) === eventIdNum);
+    if (!eventObj) return alert("Select a valid event");
+    if (memberKey === undefined || memberKey === null) return alert("Missing member id");
 
-    const eventObj = events.find(e => e.id === eventId);
-    if (!eventObj) return alert("Event not found!");
-
-    const attended = confirm("Mark attended? OK = Yes, Cancel = No");
-
-    const newEvent = {
-      memberId: member.id,
-      eventId,
-      name: eventObj.name,
-      attended
-    };
-
-    setEventData([...eventData, newEvent]);
+    await createEventAtt({
+      memberId: Number(memberKey),
+      eventId: eventIdNum,
+      attended: eventForm.attended,
+    });
+    setEventForm({ eventId: "", attended: true });
+    setShowEvent(false);
   };
 
   // DELETE EVENT ENTRY
   const deleteEvent = (index) => {
+    const entry = memberEventAttendance[index];
+    if (!entry) return;
     if (!confirm("Delete this event attendance?")) return;
-    setEventData(eventData.filter((_, i) => i !== index));
+    deleteEventAtt(entry.id);
   };
 
   // TOGGLE EVENT ATTENDANCE
   const toggleEvent = (index) => {
-    const updated = [...eventData];
-    updated[index].attended = !updated[index].attended;
-    setEventData(updated);
+    const entry = memberEventAttendance[index];
+    if (!entry?.id) return;
+    updateEventAtt(entry.id, { attended: !entry.attended });
   };
 
   return (
@@ -112,21 +125,25 @@ export default function AttendanceDetails() {
         </div>
       </div>
 
+      {(loading || eventsLoading) && <p className="text-gray-600 mb-4">Loading attendance...</p>}
+      {error && <p className="text-red-600 mb-4">{error}</p>}
+      {eventsError && <p className="text-red-600 mb-4">{eventsError}</p>}
+
       {/* DAILY ATTENDANCE */}
       <div className="bg-white p-6 rounded-lg shadow mb-10">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold">Daily Attendance</h3>
 
           {user?.role === "superadmin" && (
-            <button onClick={addNewDay} className="px-4 py-2 bg-black text-white rounded-lg">
+            <button onClick={() => setShowDay(true)} className="px-4 py-2 bg-black text-white rounded-lg">
               + Add Day
             </button>
           )}
         </div>
 
         <ul className="space-y-2">
-          {daily.map((d, i) => (
-            <li key={i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
+          {memberDaily.map((d, i) => (
+            <li key={d.id || i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
               <span>{d.date}</span>
 
               <div className="flex items-center gap-3">
@@ -152,19 +169,19 @@ export default function AttendanceDetails() {
           <h3 className="text-xl font-semibold">Event Attendance</h3>
 
           {user?.role === "superadmin" && (
-            <button onClick={addNewEvent} className="px-4 py-2 bg-black text-white rounded-lg">
+            <button onClick={() => setShowEvent(true)} className="px-4 py-2 bg-black text-white rounded-lg">
               + Add Event
             </button>
           )}
         </div>
 
-        {eventData.length === 0 ? (
+        {memberEventAttendance.length === 0 ? (
           <p className="text-gray-500">No event attendance recorded.</p>
         ) : (
           <ul className="space-y-2">
-            {eventData.map((e, i) => (
-              <li key={i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
-                <span>{e.name}</span>
+            {memberEventAttendance.map((e, i) => (
+              <li key={e.id || i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
+                <span>{eventsList.find((evt) => String(evt.id) === String(e.eventId))?.name || "Event"}</span>
 
                 <div className="flex items-center gap-3">
                   <span className={e.attended ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
@@ -183,6 +200,86 @@ export default function AttendanceDetails() {
           </ul>
         )}
       </div>
+
+      <Modal
+        open={showDay}
+        title="Add Daily Attendance"
+        onClose={() => setShowDay(false)}
+        footer={(
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setShowDay(false)} className="px-4 py-2 rounded-lg border" type="button">
+              Cancel
+            </button>
+            <button onClick={addNewDay} className="px-4 py-2 rounded-lg bg-black text-white" type="button">
+              Save
+            </button>
+          </div>
+        )}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Date</label>
+            <input
+              type="date"
+              className="w-full rounded-lg border p-2"
+              value={dayForm.date}
+              onChange={(e) => setDayForm({ ...dayForm, date: e.target.value })}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="present"
+              checked={dayForm.present}
+              onChange={(e) => setDayForm({ ...dayForm, present: e.target.checked })}
+            />
+            <label htmlFor="present" className="text-sm text-gray-700">Marked Present</label>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showEvent}
+        title="Add Event Attendance"
+        onClose={() => setShowEvent(false)}
+        footer={(
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setShowEvent(false)} className="px-4 py-2 rounded-lg border" type="button">
+              Cancel
+            </button>
+            <button onClick={addNewEvent} className="px-4 py-2 rounded-lg bg-black text-white" type="button">
+              Save
+            </button>
+          </div>
+        )}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Event</label>
+            <select
+              className="w-full rounded-lg border p-2"
+              value={eventForm.eventId}
+              onChange={(e) => setEventForm({ ...eventForm, eventId: e.target.value })}
+            >
+              <option value="">Select event</option>
+              {eventsList.map((evt) => (
+                <option key={evt.id} value={evt.id}>
+                  {evt.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="attended"
+              checked={eventForm.attended}
+              onChange={(e) => setEventForm({ ...eventForm, attended: e.target.checked })}
+            />
+            <label htmlFor="attended" className="text-sm text-gray-700">Attended</label>
+          </div>
+        </div>
+      </Modal>
 
     </div>
   );

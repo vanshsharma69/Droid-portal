@@ -1,9 +1,10 @@
-import { members } from "../Data/members";
 import { Crown } from "lucide-react";
+import { useMembers } from "../context/MembersContext";
 
 export default function Leaderboard() {
-  // Sort members by points (high → low)
-  const sorted = [...members].sort((a, b) => b.points - a.points);
+  const { members, loading, error } = useMembers();
+
+  const sorted = [...members].sort((a, b) => (b.points || 0) - (a.points || 0));
 
   // Rank colors
   const rankStyles = {
@@ -15,6 +16,9 @@ export default function Leaderboard() {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Leaderboard</h1>
+
+      {loading && <p className="text-gray-600">Loading members...</p>}
+      {error && <p className="text-red-600">{error}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 

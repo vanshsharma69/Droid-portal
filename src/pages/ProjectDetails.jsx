@@ -1,168 +1,179 @@
-import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-// import { useMembers } from "../context/MembersContext";
-import { useState } from "react";
+import { useProjects } from "../context/ProjectsContext";
+import { useMembers } from "../context/MembersContext";
 
 export default function ProjectDetails() {
   const { state } = useLocation();
+  const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const { members, updateMember } = useMembers();
+  const { getProjectById, fetchProject, updateProject, deleteProject, projects } = useProjects();
+  const { members } = useMembers();
 
-  const p = state?.project;
-
-  if (!p) return <h1 className="text-xl font-bold">Project not found</h1>;
-
-  const [project, setProject] = useState({ ...p });
+  const [project, setProject] = useState(state?.project || null);
   const [editMode, setEditMode] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Save changes BACK to global members list
-  const saveProject = () => {
-    members.forEach((m) => {
-      const index = m.projects.findIndex((pr) => pr.projectId === project.projectId);
-      if (index !== -1) {
-        const updatedProjects = [...m.projects];
-        updatedProjects[index] = project;
-        updateMember(m.id, { projects: updatedProjects });
-      }
-    });
-
-    alert("Project updated successfully!");
-    setEditMode(false);
+  const projectIdKey = (p) => p?.projectId ?? p?.id ?? p?._id;
+  const normalizeMemberId = (val) => {
+    const raw = typeof val === "object" ? val?.memberId ?? val?.id : val;
+    const num = Number(raw);
+    return Number.isNaN(num) ? null : num;
   };
 
-  const update = (field, value) => {
+  useEffect(() => {
+    const lookupId = id || projectIdKey(state?.project);
+    const existing = lookupId ? getProjectById(lookupId) || state?.project : state?.project;
+    if (existing) {
+      setProject(existing);
+      return;
+    }
+    if (!lookupId) return;
+    fetchProject(lookupId)
+      .then(setProject)
+      .catch((err) => setError(err?.message || "Project not found"));
+  }, [getProjectById, fetchProject, id, state]);
+
+  useEffect(() => {
+    const lookupId = id || projectIdKey(state?.project);
+    const latest = lookupId ? getProjectById(lookupId) : null;
+    if (latest) setProject(latest);
+  }, [projects, getProjectById, id, state]);
+
+  if (error) return <h1 className="text-xl font-bold text-red-600">{error}</h1>;
+  if (!project) return <h1 className="text-xl font-bold">Project not found</h1>;
+
+  const assignedIds = Array.isArray(project.assignedMembers)
+    ? project.assignedMembers.map((m) => normalizeMemberId(m)).filter((v) => v !== null)
+    : [];
+
+  const assignedMembers = assignedIds
+    .map((idVal) => members.find((m) => normalizeMemberId(m) === idVal))
+    .filter(Boolean);
+
+  const availableMembers = members.filter((m) => {
+    const mid = normalizeMemberId(m);
+    if (mid === null) return false;
+    return !assignedIds.some((idVal) => idVal === mid);
+  });
+
+  const updateField = (field, value) => {
     setProject({ ...project, [field]: value });
   };
 
-  // BUG CRUD
-  const addBug = () => {
-    const title = prompt("Bug title?");
-    if (!title) return;
+  const handleSave = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const pid = projectIdKey(project);
+      const pidNum = pid !== undefined && pid !== null ? Number(pid) : null;
+      const payload = { ...project, assignedMembers: assignedIds };
+      if (!Number.isNaN(pidNum)) {
+        payload.projectId = pidNum;
+      } else {
+        delete payload.projectId;
+      }
 
-    const bug = { bugId: Date.now(), title, status: "Open" };
-    setProject({ ...project, bugs: [...project.bugs, bug] });
+      await updateProject(pid, payload);
+      setEditMode(false);
+    } catch (err) {
+      setError(err?.message || "Failed to update project");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const toggleBugStatus = (index) => {
-    const updated = [...project.bugs];
-    updated[index].status = updated[index].status === "Open" ? "Resolved" : "Open";
-    setProject({ ...project, bugs: updated });
+  const handleDelete = async () => {
+    if (!confirm("Delete this project?")) return;
+    setBusy(true);
+    try {
+      await deleteProject(projectIdKey(project));
+      navigate("/projects");
+    } catch (err) {
+      setError(err?.message || "Failed to delete project");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const deleteBug = (index) => {
-    if (!confirm("Delete this bug?")) return;
+  const assignMember = (idToAdd) => {
+    const normalized = normalizeMemberId(idToAdd);
+    if (!normalized) return;
+    if (assignedIds.some((v) => v === normalized)) return;
+    setProject({ ...project, assignedMembers: [...assignedIds, normalized] });
+  };
 
+  const removeMember = (memberId) => {
     setProject({
       ...project,
-      bugs: project.bugs.filter((_, i) => i !== index),
-    });
-  };
-
-  // FEEDBACK CRUD
-  const addFeedback = () => {
-    const by = prompt("Feedback by:");
-    if (!by) return;
-
-    const text = prompt("Feedback message:");
-    if (!text) return;
-
-    const stars = Number(prompt("Stars (1-5)?"));
-    if (!stars) return;
-
-    const fb = { by, text, stars };
-    setProject({ ...project, feedback: [...project.feedback, fb] });
-  };
-
-  const deleteFeedback = (index) => {
-    if (!confirm("Delete feedback?")) return;
-
-    setProject({
-      ...project,
-      feedback: project.feedback.filter((_, i) => i !== index),
-    });
-  };
-
-  // MEMBER ASSIGNMENT CRUD
-  const unassigned = members.filter(
-    (m) => !project.assignedMembers.some((am) => am.id === m.id)
-  );
-
-  const assignMember = () => {
-    const names = unassigned.map((m) => m.name).join("\n");
-    const selected = prompt("Assign member:\n\n" + names);
-
-    if (!selected) return;
-
-    const mem = unassigned.find((m) => m.name === selected);
-    if (!mem) return alert("Invalid member name");
-
-    setProject({
-      ...project,
-      assignedMembers: [...project.assignedMembers, mem],
-    });
-  };
-
-  const removeMember = (id) => {
-    if (!confirm("Remove member?")) return;
-
-    setProject({
-      ...project,
-      assignedMembers: project.assignedMembers.filter((m) => m.id !== id),
+      assignedMembers: assignedIds.filter((idVal) => idVal !== normalizeMemberId(memberId)),
     });
   };
 
   return (
     <div className="max-w-6xl mx-auto py-10">
 
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Project Details</h1>
 
-        {user?.role === "superadmin" && (
-          <button
-            onClick={() => (editMode ? saveProject() : setEditMode(true))}
-            className="px-4 py-2 bg-black text-white rounded-lg"
-          >
-            {editMode ? "Save Changes" : "Edit Project"}
-          </button>
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <div className="flex gap-3">
+            <button
+              onClick={() => (editMode ? handleSave() : setEditMode(true))}
+              disabled={busy}
+              className="px-4 py-2 bg-black text-white rounded-lg disabled:opacity-60"
+            >
+              {editMode ? (busy ? "Saving..." : "Save Changes") : "Edit Project"}
+            </button>
+
+            <button
+              onClick={handleDelete}
+              disabled={busy}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-60"
+            >
+              {busy ? "Working..." : "Delete"}
+            </button>
+          </div>
         )}
       </div>
 
+      {error && <p className="text-red-600 mb-4">{error}</p>}
+
       <div className="bg-white p-6 rounded-lg shadow">
 
-        {/* NAME */}
         {!editMode ? (
           <h2 className="text-3xl font-bold">{project.name}</h2>
         ) : (
           <input
             className="w-full p-2 border rounded text-xl font-bold"
-            value={project.name}
-            onChange={(e) => update("name", e.target.value)}
+            value={project.name || ""}
+            onChange={(e) => updateField("name", e.target.value)}
           />
         )}
 
-        {/* DESCRIPTION */}
         {!editMode ? (
           <p className="text-gray-600 mt-2">{project.description}</p>
         ) : (
           <textarea
             className="w-full p-2 border rounded mt-2"
-            value={project.description}
-            onChange={(e) => update("description", e.target.value)}
+            value={project.description || ""}
+            onChange={(e) => updateField("description", e.target.value)}
           />
         )}
 
-        {/* STATUS + DEADLINE */}
         <div className="mt-6 text-lg space-y-2">
           <p>
             <span className="font-semibold">Status:</span>{" "}
             {!editMode ? (
-              project.status
+              project.status || "Pending"
             ) : (
               <select
                 className="border p-2 rounded"
-                value={project.status}
-                onChange={(e) => update("status", e.target.value)}
+                value={project.status || "Pending"}
+                onChange={(e) => updateField("status", e.target.value)}
               >
                 <option>In Progress</option>
                 <option>Completed</option>
@@ -174,109 +185,45 @@ export default function ProjectDetails() {
           <p>
             <span className="font-semibold">Deadline:</span>{" "}
             {!editMode ? (
-              project.deadline
+              project.deadline || "Not set"
             ) : (
               <input
                 type="date"
                 className="border p-2 rounded"
-                value={project.deadline}
-                onChange={(e) => update("deadline", e.target.value)}
+                value={project.deadline || ""}
+                onChange={(e) => updateField("deadline", e.target.value)}
               />
             )}
           </p>
         </div>
 
-        {/* BUGS */}
-        <div className="mt-10">
-          <div className="flex justify-between">
-            <h3 className="text-2xl font-semibold">Bugs</h3>
-
-            {user?.role === "superadmin" && (
-              <button onClick={addBug} className="px-3 py-1 bg-black text-white rounded">
-                + Add Bug
-              </button>
-            )}
-          </div>
-
-          <ul className="mt-4 space-y-3">
-            {project.bugs.map((b, i) => (
-              <li key={b.bugId} className="p-4 border rounded flex justify-between">
-                <span>{b.title}</span>
-                <div className="flex gap-3 items-center">
-                  <span className={b.status === "Open" ? "text-red-600" : "text-green-600"}>
-                    {b.status}
-                  </span>
-
-                  {user?.role === "superadmin" && (
-                    <>
-                      <button
-                        onClick={() => toggleBugStatus(i)}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-                      >
-                        Toggle
-                      </button>
-
-                      <button
-                        onClick={() => deleteBug(i)}
-                        className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* FEEDBACK */}
-        <div className="mt-10">
-          <div className="flex justify-between">
-            <h3 className="text-2xl font-semibold">Feedback</h3>
-
-            {user?.role === "superadmin" && (
-              <button onClick={addFeedback} className="px-3 py-1 bg-black text-white rounded">
-                + Add Feedback
-              </button>
-            )}
-          </div>
-
-          <ul className="mt-4 space-y-3">
-            {project.feedback.map((fb, i) => (
-              <li className="p-4 border rounded" key={i}>
-                <p className="font-semibold">{fb.by}</p>
-                <p>{fb.text}</p>
-                <p className="text-yellow-600">⭐ {fb.stars}</p>
-
-                {user?.role === "superadmin" && (
-                  <button
-                    onClick={() => deleteFeedback(i)}
-                    className="mt-2 px-2 py-1 bg-red-100 text-red-700 text-xs rounded"
-                  >
-                    Delete
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* MEMBER ASSIGNMENT */}
         <div className="mt-10">
           <div className="flex justify-between">
             <h3 className="text-2xl font-semibold">Assigned Members</h3>
 
-            {user?.role === "superadmin" && (
-              <button onClick={assignMember} className="px-3 py-1 bg-black text-white rounded">
-                + Assign Member
-              </button>
+            {(user?.role === "superadmin" || user?.role === "admin") && availableMembers.length > 0 && (
+              <select
+                className="border p-2 rounded"
+                onChange={(e) => assignMember(e.target.value)}
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  + Assign Member
+                </option>
+                {availableMembers.map((m) => (
+                  <option key={m.id} value={m.memberId ?? m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
             )}
           </div>
 
           <ul className="mt-4 space-y-3">
-            {project.assignedMembers.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 p-4 border rounded">
+            {assignedMembers.length === 0 && <li className="text-gray-600">No members assigned.</li>}
+
+            {assignedMembers.map((m) => (
+              <li key={m.memberId ?? m.id} className="flex items-center gap-3 p-4 border rounded">
                 <img src={m.img} className="w-12 h-12 rounded-full" />
 
                 <div>
@@ -284,9 +231,9 @@ export default function ProjectDetails() {
                   <p className="text-gray-500">{m.role}</p>
                 </div>
 
-                {user?.role === "superadmin" && (
+                {(user?.role === "superadmin" || user?.role === "admin") && (
                   <button
-                    onClick={() => removeMember(m.id)}
+                    onClick={() => removeMember(m.memberId ?? m.id)}
                     className="ml-auto px-2 py-1 text-xs bg-red-100 text-red-700 rounded"
                   >
                     Remove

@@ -5,7 +5,7 @@ export const projects = [
     description: "Updating UI/UX and backend.",
     status: "In Progress",
     deadline: "2025-02-10",
-    assignedMembers: [1], // IDs of members
+    assignedMembers: [1], 
     bugs: [
       { id: 1, title: "Navbar overlap", status: "Open" },
       { id: 2, title: "Login redirect issue", status: "Resolved" },

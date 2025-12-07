@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 export default function Layout({ children }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const navItems = [
     { name: "Dashboard", path: "/dashboard" },

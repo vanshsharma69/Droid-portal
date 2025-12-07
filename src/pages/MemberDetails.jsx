@@ -1,30 +1,104 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useState } from "react";
+import { useMembers } from "../context/MembersContext";
+
+const normalizeMember = (m) => {
+  if (!m) return m;
+  const id = m.id || m._id;
+  return { ...m, id };
+};
 
 export default function MemberDetails() {
-  const { state } = useLocation();
+  const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { members, getMemberById, updateMember, deleteMember, refresh } = useMembers();
 
-  const m = state?.m;
-
-  if (!m) return <h1 className="text-xl font-bold">Member not found</h1>;
-
-  // Local editable state
-  const [member, setMember] = useState({ ...m });
+  const [member, setMember] = useState(null);
   const [editMode, setEditMode] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [newImage, setNewImage] = useState(null);
 
-  // Handle change
+  const isAdmin = user && (user.role === "superadmin" || user.role === "admin");
+  const canEdit = Boolean(isAdmin);
+  const canDelete = Boolean(isAdmin);
+
+  const memberKey = (m) => m?.id ?? m?._id ?? m?.memberId;
+  const targetId = id;
+
+  useEffect(() => {
+    const current = getMemberById(targetId);
+    if (current) {
+      setMember(normalizeMember(current));
+    } else {
+      refresh();
+    }
+  }, [getMemberById, targetId, refresh]);
+
+  useEffect(() => {
+    const current = getMemberById(targetId);
+    if (current) setMember(normalizeMember(current));
+  }, [members, getMemberById, targetId]);
+
+  if (!member) return <h1 className="text-xl font-bold">Member not found</h1>;
+
+  const memberObj = normalizeMember(member);
+  if (!memberObj || memberKey(memberObj) === undefined) return <h1 className="text-xl font-bold">Member not found</h1>;
+
   const updateField = (field, value) => {
     setMember({ ...member, [field]: value });
   };
 
-  // Delete member
-  const deleteMember = () => {
-    if (!confirm("Are you sure you want to delete this member?")) return;
-    alert("Member deleted (local only, backend not connected)");
-    navigate("/members");
+  const handleSave = async () => {
+    setBusy(true);
+    try {
+      if (newImage) {
+        const fd = new FormData();
+        Object.entries(memberObj || {}).forEach(([key, value]) => {
+          if (key === "id" || key === "_id" || key === "img") return;
+          if (value !== undefined && value !== null) {
+            if (key === "memberId") {
+              const num = Number(value);
+              fd.append(key, Number.isNaN(num) ? value : num);
+            } else {
+              fd.append(key, String(value));
+            }
+          }
+        });
+        fd.append("img", newImage);
+        await updateMember(memberKey(memberObj), fd);
+      } else {
+        const payload = { ...memberObj };
+        delete payload._id;
+        delete payload.id;
+        delete payload.img;
+        if (payload.memberId !== undefined && payload.memberId !== null) {
+          const num = Number(payload.memberId);
+          payload.memberId = Number.isNaN(num) ? payload.memberId : num;
+        }
+        await updateMember(memberKey(memberObj), payload);
+      }
+      setNewImage(null);
+      setEditMode(false);
+    } catch (err) {
+      alert(err?.message || "Failed to update member");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Delete this member?")) return;
+    setBusy(true);
+    try {
+      await deleteMember(memberKey(memberObj));
+      navigate("/members");
+    } catch (err) {
+      alert(err?.message || "Failed to delete member");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -35,30 +109,25 @@ export default function MemberDetails() {
         <h1 className="text-3xl font-bold">Member Details</h1>
 
         {/* SuperAdmin Controls */}
-        {user?.role === "superadmin" && (
+        {canEdit && (
           <div className="flex gap-3">
-            {!editMode ? (
+            <button
+              onClick={() => (editMode ? handleSave() : setEditMode(true))}
+              disabled={busy}
+              className="px-4 py-2 bg-black text-white rounded-lg disabled:opacity-60"
+            >
+              {editMode ? (busy ? "Saving..." : "Save Changes") : "Edit Member"}
+            </button>
+
+            {canDelete && (
               <button
-                onClick={() => setEditMode(true)}
-                className="px-4 py-2 bg-black text-white rounded-lg"
+                onClick={handleDelete}
+                disabled={busy}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-60"
               >
-                Edit Member
-              </button>
-            ) : (
-              <button
-                onClick={() => setEditMode(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
-              >
-                Save Changes
+                {busy ? "Working..." : "Delete"}
               </button>
             )}
-
-            <button
-              onClick={deleteMember}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg"
-            >
-              Delete
-            </button>
           </div>
         )}
       </div>
@@ -69,10 +138,18 @@ export default function MemberDetails() {
         {/* LEFT — Image */}
         <div className="w-full md:w-1/2 flex justify-center">
           <img
-            src={member.img}
-            alt={member.name}
+            src={memberObj.img}
+            alt={memberObj.name}
             className="w-100 h-[420px] object-cover rounded-xl shadow-md"
           />
+          {editMode && (
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setNewImage(e.target.files?.[0] || null)}
+              className="mt-3 w-full border rounded p-2"
+            />
+          )}
         </div>
 
         {/* RIGHT — Info */}
@@ -87,6 +164,7 @@ export default function MemberDetails() {
               className="text-3xl font-bold border p-2 rounded w-full"
               value={member.name}
               onChange={(e) => updateField("name", e.target.value)}
+              disabled={!isAdmin}
             />
           )}
 
@@ -99,6 +177,7 @@ export default function MemberDetails() {
               className="text-xl border p-2 rounded w-full"
               value={member.role}
               onChange={(e) => updateField("role", e.target.value)}
+              disabled={!isAdmin}
             />
           )}
 
@@ -120,6 +199,7 @@ export default function MemberDetails() {
                   className="border p-1 rounded ml-2"
                   value={member.points}
                   onChange={(e) => updateField("points", e.target.value)}
+                  disabled={!isAdmin}
                 />
               )}
             </div>
@@ -135,6 +215,7 @@ export default function MemberDetails() {
                   className="border p-1 rounded ml-2"
                   value={member.birthday}
                   onChange={(e) => updateField("birthday", e.target.value)}
+                  disabled={!isAdmin}
                 />
               )}
             </div>
@@ -150,6 +231,7 @@ export default function MemberDetails() {
                   className="border p-1 rounded ml-2"
                   value={member.year}
                   onChange={(e) => updateField("year", e.target.value)}
+                  disabled={!isAdmin}
                 />
               )}
             </div>
@@ -165,6 +247,7 @@ export default function MemberDetails() {
                   className="border p-1 rounded ml-2"
                   value={member.course}
                   onChange={(e) => updateField("course", e.target.value)}
+                  disabled={!isAdmin}
                 />
               )}
             </div>
@@ -180,6 +263,7 @@ export default function MemberDetails() {
                   className="border p-1 rounded ml-2"
                   value={member.branch}
                   onChange={(e) => updateField("branch", e.target.value)}
+                  disabled={!isAdmin}
                 />
               )}
             </div>
@@ -195,6 +279,7 @@ export default function MemberDetails() {
                   className="border p-1 rounded ml-2"
                   value={member.roll}
                   onChange={(e) => updateField("roll", e.target.value)}
+                  disabled={!isAdmin}
                 />
               )}
             </div>

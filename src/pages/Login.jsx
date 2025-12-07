@@ -1,25 +1,38 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, error: authError } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const statePrefill = location.state || {};
+
+  const [email, setEmail] = useState(statePrefill.email || "aditya@droid.com");
+  const [password, setPassword] = useState(statePrefill.password || "Aditya@droid123");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleLogin = (e) => {
+  useEffect(() => {
+    if (statePrefill.email) setEmail(statePrefill.email);
+    if (statePrefill.password) setPassword(statePrefill.password);
+  }, [statePrefill.email, statePrefill.password]);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
+    setError("");
 
-    const res = login(email, password);
+    const res = await login(email, password);
 
     if (res.success) {
       navigate("/dashboard");
     } else {
       setError(res.message);
     }
+
+    setSubmitting(false);
   };
 
   return (
@@ -29,8 +42,8 @@ export default function Login() {
 
         <h1 className="text-2xl font-bold text-center mb-6">Droid Portal Login</h1>
 
-        {error && (
-          <p className="text-red-600 text-center mb-3">{error}</p>
+        {(error || authError) && (
+          <p className="text-red-600 text-center mb-3">{error || authError}</p>
         )}
 
         <form onSubmit={handleLogin} className="space-y-5">
@@ -40,7 +53,7 @@ export default function Login() {
             <input
               type="email"
               className="w-full p-3 border rounded-lg bg-gray-50"
-              placeholder="admin@droid.com"
+              placeholder="aditya@droid.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -51,7 +64,7 @@ export default function Login() {
             <input
               type="password"
               className="w-full p-3 border rounded-lg bg-gray-50"
-              placeholder="admin123"
+              placeholder="Aditya@droid123"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -59,9 +72,10 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-900 transition"
+            disabled={submitting}
+            className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-900 transition disabled:opacity-60"
           >
-            Login
+            {submitting ? "Signing in..." : "Login"}
           </button>
 
         </form>
