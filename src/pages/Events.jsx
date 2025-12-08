@@ -15,7 +15,12 @@ export default function Events() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", date: "", venue: "" });
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    date: "",
+    venue: "",
+  });
 
   useEffect(() => {
     refresh();
@@ -24,11 +29,16 @@ export default function Events() {
 
   const eventList = useMemo(() => {
     return events.map((ev) => {
-      const eid = ev.eventId ?? ev.id ?? ev._id;
+      const eidRaw = ev.eventId ?? ev.id ?? ev._id;
+      const eidNum = Number(eidRaw);
+      const eid = Number.isNaN(eidNum) ? eidRaw : eidNum;
+
       const assignedMembers = eventAttendance
         .filter((a) => String(a.eventId) === String(eid))
         .map((a) => {
-          const member = members.find((m) => String(m.memberId ?? m.id) === String(a.memberId));
+          const member = members.find(
+            (m) => String(m.memberId ?? m.id) === String(a.memberId)
+          );
           return { ...a, member };
         })
         .filter((a) => a.member);
@@ -43,15 +53,20 @@ export default function Events() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.date || !form.venue) return alert("Name, date, and venue are required");
+    if (!form.name || !form.date || !form.venue)
+      return alert("Name, date, and venue are required");
+
     try {
       setBusy(true);
       await createEvent({
         ...form,
         assignedMembers: Array.isArray(form.assignedMembers)
-          ? form.assignedMembers.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
+          ? form.assignedMembers
+              .map((id) => Number(id))
+              .filter((n) => !Number.isNaN(n))
           : [],
       });
+
       setForm({ name: "", description: "", date: "", venue: "" });
       setShowAdd(false);
     } catch (err) {
@@ -63,8 +78,10 @@ export default function Events() {
 
   return (
     <div>
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Events</h1>
+
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
             onClick={() => setShowAdd(true)}
@@ -82,16 +99,15 @@ export default function Events() {
         <p className="text-gray-600">No events found.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-
           {eventList.map((ev) => (
             <Link
-              key={ev.id}
-              to={`/events/${ev.eventId ?? ev.id ?? ev._id}`}
+              key={ev.eventId}
+              to={`/events/${ev.eventId}`}
               state={{ event: ev }}
               className="block"
             >
               <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg transition-all border border-gray-200 cursor-pointer">
-
+                
                 {/* Icon + Name */}
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-full bg-gray-100">
@@ -111,12 +127,11 @@ export default function Events() {
 
                   <p>
                     <span className="font-semibold">Date:</span>{" "}
-                    {ev.date}
+                    {ev.date ? new Date(ev.date).toLocaleDateString() : "N/A"}
                   </p>
 
                   <p>
-                    <span className="font-semibold">Venue:</span>{" "}
-                    {ev.venue || "TBD"}
+                    <span className="font-semibold">Venue:</span> {ev.venue}
                   </p>
                 </div>
 
@@ -136,21 +151,24 @@ export default function Events() {
                     </div>
                   )}
                 </div>
-
               </div>
             </Link>
           ))}
-
         </div>
       )}
 
+      {/* Modal */}
       <Modal
         open={showAdd}
         title="Add Event"
         onClose={() => setShowAdd(false)}
-        footer={(
+        footer={
           <div className="flex justify-end gap-3">
-            <button onClick={() => setShowAdd(false)} type="button" className="px-4 py-2 rounded border">
+            <button
+              onClick={() => setShowAdd(false)}
+              type="button"
+              className="px-4 py-2 rounded border"
+            >
               Cancel
             </button>
             <button
@@ -162,7 +180,7 @@ export default function Events() {
               {busy ? "Creating..." : "Create"}
             </button>
           </div>
-        )}
+        }
       >
         <form className="space-y-3" onSubmit={handleCreate}>
           <div>
@@ -174,6 +192,7 @@ export default function Events() {
               required
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">Description</label>
             <textarea
@@ -182,6 +201,7 @@ export default function Events() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700">Date</label>
@@ -193,6 +213,7 @@ export default function Events() {
                 required
               />
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700">Venue</label>
               <input

@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 
 import Dashboard from "./pages/Dashboard";
@@ -19,6 +19,9 @@ import Leaderboard from "./pages/Leaderboard";
 export default function App() {
   return (
     <Routes>
+      {/* Redirect root to dashboard */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
       {/* PUBLIC ROUTE */}
       <Route path="/login" element={<Login />} />
 
@@ -131,6 +134,9 @@ export default function App() {
           </PrivateRoute>
         }
       />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

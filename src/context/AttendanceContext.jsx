@@ -11,6 +11,8 @@ export function AttendanceProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const keyMatch = (record, id) => String(record?.id ?? record?._id) === String(id);
+
   const refreshDaily = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -23,7 +25,7 @@ export function AttendanceProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   const refreshEventAttendance = useCallback(async () => {
     setLoading(true);
@@ -37,7 +39,7 @@ export function AttendanceProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     refreshDaily();
@@ -58,7 +60,7 @@ export function AttendanceProvider({ children }) {
     async (id, payload) => {
       const res = await api.updateDailyAttendance(id, payload, token);
       const updated = res?.attendance || res;
-      setDaily((prev) => prev.map((d) => (String(d.id) === String(id) ? { ...d, ...updated } : d)));
+      setDaily((prev) => prev.map((d) => (keyMatch(d, id) ? { ...d, ...updated } : d)));
       return updated;
     },
     [token]
@@ -67,7 +69,7 @@ export function AttendanceProvider({ children }) {
   const deleteDaily = useCallback(
     async (id) => {
       await api.deleteDailyAttendance(id, token);
-      setDaily((prev) => prev.filter((d) => String(d.id) !== String(id)));
+      setDaily((prev) => prev.filter((d) => !keyMatch(d, id)));
     },
     [token]
   );
@@ -105,7 +107,7 @@ export function AttendanceProvider({ children }) {
     async (id, payload) => {
       const res = await api.updateEventAttendance(id, payload, token);
       const updated = res?.attendance || res;
-      setEventAttendance((prev) => prev.map((e) => (String(e.id) === String(id) ? { ...e, ...updated } : e)));
+      setEventAttendance((prev) => prev.map((e) => (keyMatch(e, id) ? { ...e, ...updated } : e)));
       return updated;
     },
     [token]
@@ -114,7 +116,7 @@ export function AttendanceProvider({ children }) {
   const deleteEventAtt = useCallback(
     async (id) => {
       await api.deleteEventAttendance(id, token);
-      setEventAttendance((prev) => prev.filter((e) => String(e.id) !== String(id)));
+      setEventAttendance((prev) => prev.filter((e) => !keyMatch(e, id)));
     },
     [token]
   );

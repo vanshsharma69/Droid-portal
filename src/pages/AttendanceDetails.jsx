@@ -7,7 +7,7 @@ import { useEvents } from "../context/EventsContext";
 
 const normalizeMember = (m) => {
   if (!m) return m;
-  const id = m.id || m._id;
+  const id = m.memberId ?? m.id ?? m._id;
   return { ...m, id };
 };
 
@@ -26,9 +26,10 @@ export default function AttendanceDetails() {
     updateEventAtt,
     deleteEventAtt,
   } = useAttendance();
-  const { events, loading: eventsLoading, error: eventsError } = useEvents();
-  const eventsList = events || [];
 
+  const { events, loading: eventsLoading, error: eventsError } = useEvents();
+
+  const eventsList = events || [];
   const member = normalizeMember(state?.member);
 
   if (!member) {
@@ -36,7 +37,10 @@ export default function AttendanceDetails() {
   }
 
   const memberKey = member.memberId ?? member.id;
-  const memberDaily = (daily || []).filter((d) => String(d.memberId) === String(memberKey));
+
+  const memberDaily = (daily || []).filter(
+    (d) => String(d.memberId) === String(memberKey)
+  );
   const memberEventAttendance = (eventAttendance || []).filter(
     (e) => String(e.memberId) === String(memberKey)
   );
@@ -48,65 +52,74 @@ export default function AttendanceDetails() {
 
   // SUMMARY
   const totalDays = memberDaily.length;
-  const presentDays = memberDaily.filter(d => d.present).length;
+  const presentDays = memberDaily.filter((d) => d.present).length;
   const percent = totalDays ? Math.round((presentDays / totalDays) * 100) : 0;
 
   const addNewDay = async () => {
     if (!dayForm.date) return alert("Date is required");
-    if (memberKey === undefined || memberKey === null) return alert("Missing member id");
-    await createDaily({ memberId: Number(memberKey), date: dayForm.date, present: dayForm.present });
+    await createDaily({
+      memberId: Number(memberKey),
+      date: dayForm.date,
+      present: dayForm.present,
+    });
     setDayForm({ date: "", present: true });
     setShowDay(false);
   };
 
-  const deleteDay = (index) => {
+  const recordKey = (rec) => rec?.id ?? rec?._id;
+
+  const deleteDay = async (index) => {
     const entry = memberDaily[index];
     if (!entry) return;
+    const id = recordKey(entry);
+    if (!id) return alert("Missing id for this entry");
     if (!confirm("Delete this entry?")) return;
-    deleteDaily(entry.id);
+    await deleteDaily(id);
   };
 
-  // TOGGLE PRESENT
   const toggleDay = (index) => {
     const entry = memberDaily[index];
-    if (!entry?.id) return;
-    updateDaily(entry.id, { present: !entry.present });
+    const id = recordKey(entry);
+    if (!id) return;
+    updateDaily(id, { present: !entry.present });
   };
 
   const addNewEvent = async () => {
     const eventIdNum = Number(eventForm.eventId);
-    const eventObj = eventsList.find((e) => Number(e.id) === eventIdNum);
+
+    // FIXED lookup
+    const eventObj = eventsList.find((e) => Number(e.eventId) === eventIdNum);
+
     if (!eventObj) return alert("Select a valid event");
-    if (memberKey === undefined || memberKey === null) return alert("Missing member id");
 
     await createEventAtt({
       memberId: Number(memberKey),
-      eventId: eventIdNum,
+      eventId: eventIdNum, // FIXED ✔ numeric
       attended: eventForm.attended,
     });
+
     setEventForm({ eventId: "", attended: true });
     setShowEvent(false);
   };
 
-  // DELETE EVENT ENTRY
-  const deleteEvent = (index) => {
+  const deleteEvent = async (index) => {
     const entry = memberEventAttendance[index];
     if (!entry) return;
+    const id = recordKey(entry);
+    if (!id) return alert("Missing id for this entry");
     if (!confirm("Delete this event attendance?")) return;
-    deleteEventAtt(entry.id);
+    await deleteEventAtt(id);
   };
 
-  // TOGGLE EVENT ATTENDANCE
   const toggleEvent = (index) => {
     const entry = memberEventAttendance[index];
-    if (!entry?.id) return;
-    updateEventAtt(entry.id, { attended: !entry.attended });
+    const id = recordKey(entry);
+    if (!id) return;
+    updateEventAtt(id, { attended: !entry.attended });
   };
 
   return (
     <div className="max-w-6xl mx-auto py-10">
-
-      {/* PAGE HEADER */}
       <h1 className="text-3xl font-bold mb-8">Attendance Details</h1>
 
       {/* MEMBER CARD */}
@@ -125,7 +138,9 @@ export default function AttendanceDetails() {
         </div>
       </div>
 
-      {(loading || eventsLoading) && <p className="text-gray-600 mb-4">Loading attendance...</p>}
+      {(loading || eventsLoading) && (
+        <p className="text-gray-600 mb-4">Loading attendance...</p>
+      )}
       {error && <p className="text-red-600 mb-4">{error}</p>}
       {eventsError && <p className="text-red-600 mb-4">{eventsError}</p>}
 
@@ -181,7 +196,11 @@ export default function AttendanceDetails() {
           <ul className="space-y-2">
             {memberEventAttendance.map((e, i) => (
               <li key={e.id || i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
-                <span>{eventsList.find((evt) => String(evt.id) === String(e.eventId))?.name || "Event"}</span>
+                {/* FIXED event name resolution */}
+                <span>
+                  {eventsList.find((evt) => Number(evt.eventId) === Number(e.eventId))?.name ||
+                    "Event"}
+                </span>
 
                 <div className="flex items-center gap-3">
                   <span className={e.attended ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
@@ -201,20 +220,17 @@ export default function AttendanceDetails() {
         )}
       </div>
 
+      {/* DAILY MODAL */}
       <Modal
         open={showDay}
         title="Add Daily Attendance"
         onClose={() => setShowDay(false)}
-        footer={(
+        footer={
           <div className="flex justify-end gap-3">
-            <button onClick={() => setShowDay(false)} className="px-4 py-2 rounded-lg border" type="button">
-              Cancel
-            </button>
-            <button onClick={addNewDay} className="px-4 py-2 rounded-lg bg-black text-white" type="button">
-              Save
-            </button>
+            <button onClick={() => setShowDay(false)} className="px-4 py-2 rounded-lg border">Cancel</button>
+            <button onClick={addNewDay} className="px-4 py-2 rounded-lg bg-black text-white">Save</button>
           </div>
-        )}
+        }
       >
         <div className="space-y-3">
           <div>
@@ -226,6 +242,7 @@ export default function AttendanceDetails() {
               onChange={(e) => setDayForm({ ...dayForm, date: e.target.value })}
             />
           </div>
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -238,20 +255,17 @@ export default function AttendanceDetails() {
         </div>
       </Modal>
 
+      {/* EVENT MODAL */}
       <Modal
         open={showEvent}
         title="Add Event Attendance"
         onClose={() => setShowEvent(false)}
-        footer={(
+        footer={
           <div className="flex justify-end gap-3">
-            <button onClick={() => setShowEvent(false)} className="px-4 py-2 rounded-lg border" type="button">
-              Cancel
-            </button>
-            <button onClick={addNewEvent} className="px-4 py-2 rounded-lg bg-black text-white" type="button">
-              Save
-            </button>
+            <button onClick={() => setShowEvent(false)} className="px-4 py-2 rounded-lg border">Cancel</button>
+            <button onClick={addNewEvent} className="px-4 py-2 rounded-lg bg-black text-white">Save</button>
           </div>
-        )}
+        }
       >
         <div className="space-y-3">
           <div>
@@ -262,13 +276,16 @@ export default function AttendanceDetails() {
               onChange={(e) => setEventForm({ ...eventForm, eventId: e.target.value })}
             >
               <option value="">Select event</option>
+
+              {/* FIXED: Use event.eventId (NUMBER) */}
               {eventsList.map((evt) => (
-                <option key={evt.id} value={evt.id}>
+                <option key={evt.eventId} value={evt.eventId}>
                   {evt.name}
                 </option>
               ))}
             </select>
           </div>
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -280,7 +297,6 @@ export default function AttendanceDetails() {
           </div>
         </div>
       </Modal>
-
     </div>
   );
 }
