@@ -80,9 +80,26 @@ export function AuthProvider({ children }) {
     persistSession(null, null);
   };
 
+  const changePassword = async (payload) => {
+    setError(null);
+    try {
+      const res = await api.changePassword(payload);
+      const nextUser = res.user || null;
+      const nextToken = res.token;
+      if (!nextToken) throw new Error("Missing token from server");
+
+      persistSession(nextUser, nextToken);
+      return { success: true, user: nextUser };
+    } catch (err) {
+      const message = err?.message || "Password change failed";
+      setError(message);
+      return { success: false, message };
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, error, login, register, logout }}
+      value={{ user, token, loading, error, login, register, logout, changePassword }}
     >
       {children}
     </AuthContext.Provider>

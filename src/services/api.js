@@ -12,7 +12,7 @@ async function request(path, { method = "GET", data, token } = {}) {
   });
 
   const text = await res.text();
-  let json = null;
+  let json = null;  
 
   if (text) {
     try {
@@ -33,6 +33,8 @@ async function request(path, { method = "GET", data, token } = {}) {
 export const api = {
   login: (payload) => request("/api/auth/login", { method: "POST", data: payload }),
   register: (payload) => request("/api/auth/register", { method: "POST", data: payload }),
+  changePassword: (payload) =>
+    request("/api/auth/change-password", { method: "POST", data: payload }),
   me: (token) => request("/api/auth/me", { token }),
   adminCreateMember: (payload, token) =>
     request("/api/auth/admin/create-member", { method: "POST", data: payload, token }),
