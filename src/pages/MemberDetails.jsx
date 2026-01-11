@@ -17,7 +17,14 @@ export default function MemberDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { members, getMemberById, updateMember, deleteMember, refresh } = useMembers();
+  const {
+    members,
+    loading: membersLoading,
+    getMemberById,
+    updateMember,
+    deleteMember,
+    refresh,
+  } = useMembers();
 
   const [member, setMember] = useState(null);
   const [editMode, setEditMode] = useState(false);
@@ -53,6 +60,8 @@ export default function MemberDetails() {
     [member, id, getMemberById]
   );
 
+  const memberExists = useMemo(() => Boolean(memberObj && memberKey(memberObj)), [memberObj]);
+
   const birthdayValue = useMemo(() => {
     if (!memberObj?.birthday) return "";
     const d = new Date(memberObj.birthday);
@@ -74,16 +83,29 @@ export default function MemberDetails() {
     setBusy(true);
 
     try {
-      const payload = { ...memberObj };
-      delete payload._id;
-      delete payload.id;
-      delete payload.img;
+      const memberIdValue = Number(memberObj.memberId);
 
-      if (newImage) payload.img = await fileToDataUrl(newImage);
+      const payload = new FormData();
+      payload.append("name", memberObj.name || "");
+      payload.append("role", memberObj.role || "");
+      if (memberObj.email) payload.append("email", memberObj.email);
+      if (memberObj.points !== undefined) payload.append("points", memberObj.points);
+      if (memberObj.birthday) payload.append("birthday", memberObj.birthday);
+      if (memberObj.year) payload.append("year", memberObj.year);
+      if (memberObj.course) payload.append("course", memberObj.course);
+      if (memberObj.instagram) payload.append("instagram", memberObj.instagram);
+      if (memberObj.bio) payload.append("bio", memberObj.bio);
+      if (memberObj.branch) payload.append("branch", memberObj.branch);
+      if (memberObj.roll) payload.append("roll", memberObj.roll);
+      if (!Number.isNaN(memberIdValue)) payload.append("memberId", memberIdValue);
+
+      if (newImage) {
+        payload.append("img", newImage);
+      }
 
       const updated = await updateMember(memberKey(memberObj), payload);
 
-      setMember(normalizeMember(updated || payload));
+      setMember(normalizeMember(updated || memberObj));
       setEditMode(false);
       setNewImage(null);
     } catch (err) {
@@ -108,11 +130,52 @@ export default function MemberDetails() {
   };
 
   if (!memberObj?.name) {
-    return <h1 className="text-xl font-bold">Member not found</h1>;
+    if (!memberExists && membersLoading) {
+      return (
+        <div className="min-h-[50vh] flex items-center justify-center text-gray-700">
+          Loading member details...
+        </div>
+      );
+    }
+
+    if (!memberExists) {
+      return (
+        <div className="min-h-[50vh] flex flex-col items-center justify-center text-center space-y-4 bg-white rounded-2xl shadow p-10">
+          <h1 className="text-2xl font-bold text-gray-900">Member not found</h1>
+          <p className="text-gray-600 max-w-md">
+            We could not locate this member. It may have been removed or you may not have access.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 transition"
+              type="button"
+            >
+              Go Back
+            </button>
+            <button
+              onClick={() => navigate("/members")}
+              className="px-4 py-2 rounded-lg bg-black text-white shadow hover:bg-gray-800 transition"
+              type="button"
+            >
+              View Members
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   const displayedImg = imagePreview || memberObj.img;
   const today = new Date().toISOString().substring(0, 10);
+
+  const displayName = memberObj.name || "Unnamed Member";
+  const displayRole = memberObj.role || "Member";
+  const displayMemberId = memberObj.memberId ?? memberObj.id ?? "—";
+  const displayYear = memberObj.year || "Year N/A";
+  const displayCourse = memberObj.course || "Course N/A";
+  const displayBranch = memberObj.branch || "Branch N/A";
+  const displayPoints = Number(memberObj.points) || 0;
 
   // ✨ Nice UI classes
   const labelClass = "font-semibold text-gray-700";
@@ -121,214 +184,307 @@ export default function MemberDetails() {
     "border rounded-lg p-2 text-gray-900 w-full bg-gray-50 focus:ring-2 focus:ring-black focus:outline-none";
 
   return (
-    <div className="max-w-6xl mx-auto py-10 px-4">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-10">
-        <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
-          Member Details
-        </h1>
-
-        {isAdmin && (
-          <div className="flex gap-4">
-            <button
-              className="px-5 py-2 rounded-lg bg-black text-white shadow hover:bg-gray-800 transition"
-              disabled={busy}
-              onClick={() => (editMode ? handleSave() : setEditMode(true))}
-            >
-              {editMode ? (busy ? "Saving…" : "Save Changes") : "Edit Member"}
-            </button>
-
-            <button
-              className="px-5 py-2 rounded-lg bg-red-600 text-white shadow hover:bg-red-700 transition"
-              disabled={busy}
-              onClick={handleDelete}
-            >
-              Delete
-            </button>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-white">
+      <div className="max-w-6xl mx-auto py-10 px-4">
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-gray-500">Profile</p>
+            <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Member Details</h1>
+            <p className="text-gray-600 mt-1">Review and update core member information.</p>
           </div>
-        )}
-      </div>
 
-      {/* Main Card */}
-      <div className="bg-white rounded-2xl shadow-xl p-10 flex flex-col md:flex-row gap-12">
-        {/* Left - Image */}
-        <div className="w-full md:w-1/2 flex flex-col items-center">
-          <img
-            src={displayedImg}
-            alt={memberObj.name}
-            className="w-60 h-60 object-cover rounded-2xl shadow-md border"
-          />
+          {isAdmin && (
+            <div className="flex flex-wrap gap-3">
+              <button
+                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-800 bg-white shadow-sm hover:-translate-y-[1px] hover:shadow-md transition"
+                disabled={busy}
+                onClick={() => setEditMode((prev) => !prev)}
+                type="button"
+              >
+                {editMode ? "Cancel" : "Edit"}
+              </button>
 
-          {editMode && (
-            <input
-              type="file"
-              accept="image/*"
-              className="mt-5 w-full border border-gray-300 p-2 rounded-lg"
-              onChange={(e) => setNewImage(e.target.files?.[0] || null)}
-            />
+              <button
+                className="px-5 py-2 rounded-lg bg-black text-white shadow hover:bg-gray-800 transition disabled:opacity-60"
+                disabled={busy || !editMode}
+                onClick={handleSave}
+                type="button"
+              >
+                {busy ? "Saving..." : "Save Changes"}
+              </button>
+
+              <button
+                className="px-5 py-2 rounded-lg bg-red-600 text-white shadow hover:bg-red-700 transition disabled:opacity-60"
+                disabled={busy}
+                onClick={handleDelete}
+                type="button"
+              >
+                Delete
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Right - Information */}
-        <div className="w-full md:w-1/2 space-y-6">
-          {/* Name + Role */}
-          <div>
-            {!editMode ? (
-              <h2 className="text-3xl font-bold text-gray-900">
-                {memberObj.name}
-              </h2>
-            ) : (
+        {/* Stats strip */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl border shadow-sm p-4">
+            <p className="text-xs uppercase text-gray-500">Points</p>
+            {editMode ? (
               <input
-                type="text"
-                value={memberObj.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                className={`${inputClass} text-2xl`}
+                type="number"
+                className="mt-2 w-full rounded-lg border px-3 py-2 text-lg font-semibold text-gray-900"
+                value={memberObj.points ?? ""}
+                onChange={(e) => updateField("points", e.target.value)}
+                placeholder="0"
               />
+            ) : (
+              <p className="text-2xl font-semibold text-gray-900 mt-1">{displayPoints}</p>
             )}
-
-            <p className="text-gray-600 text-lg mt-1">{memberObj.role}</p>
+            <p className="text-sm text-gray-500">Achievement</p>
           </div>
 
-          {/* Section Divider */}
-          <hr className="border-gray-300" />
+          <div className="bg-white rounded-xl border shadow-sm p-4">
+            <p className="text-xs uppercase text-gray-500">Member ID</p>
+            {editMode ? (
+              <input
+                type="text"
+                className="mt-2 w-full rounded-lg border px-3 py-2 text-lg font-semibold text-gray-900"
+                value={memberObj.memberId ?? ""}
+                onChange={(e) => updateField("memberId", e.target.value)}
+                placeholder="ID"
+              />
+            ) : (
+              <p className="text-xl font-semibold text-gray-900 mt-1">{displayMemberId}</p>
+            )}
+            <p className="text-sm text-gray-500">Unique identifier</p>
+          </div>
 
-          {/* Detail Rows */}
-          <div className="space-y-5">
-            {/* Member ID */}
-            <div>
-              <span className={labelClass}>Member ID:</span>
-              <p className={valueClass}>{memberObj.memberId}</p>
-            </div>
+          <div className="bg-white rounded-xl border shadow-sm p-4">
+            <p className="text-xs uppercase text-gray-500">Year</p>
+            {editMode ? (
+              <select
+                value={memberObj.year || ""}
+                className="mt-2 w-full rounded-lg border px-3 py-2 text-lg text-gray-900"
+                onChange={(e) => updateField("year", e.target.value)}
+              >
+                <option value="">Select Year</option>
+                <option value="1st Year">1st Year</option>
+                <option value="2nd Year">2nd Year</option>
+                <option value="3rd Year">3rd Year</option>
+                <option value="4th Year">4th Year</option>
+              </select>
+            ) : (
+              <p className="text-xl font-semibold text-gray-900 mt-1">{displayYear}</p>
+            )}
+            <p className="text-sm text-gray-500">Academic</p>
+          </div>
 
-            {/* Email */}
-            <div>
-              <span className={labelClass}>Email:</span>
-              <p className={valueClass}>{memberObj.email}</p>
-            </div>
-
-            {/* Points */}
-            <div>
-              <span className={labelClass}>Achievement Points:</span>
-              {!editMode ? (
-                <p className={valueClass}>{memberObj.points}</p>
-              ) : (
-                <input
-                  type="number"
-                  className={inputClass}
-                  value={memberObj.points}
-                  onChange={(e) => updateField("points", e.target.value)}
-                />
-              )}
-            </div>
-
-            {/* Birthday */}
-            <div>
-              <span className={labelClass}>Birthday:</span>
-              {!editMode ? (
-                <p className={valueClass}>{memberObj.birthday || "N/A"}</p>
-              ) : (
-                <input
-                  type="date"
-                  className={inputClass}
-                  max={today}
-                  value={birthdayValue}
-                  onChange={(e) => updateField("birthday", e.target.value)}
-                />
-              )}
-            </div>
-
-            {/* College Year */}
-            <div>
-              <span className={labelClass}>College Year:</span>
-              {!editMode ? (
-                <p className={valueClass}>{memberObj.year}</p>
-              ) : (
-                <select
-                  value={memberObj.year || ""}
-                  className={inputClass}
-                  onChange={(e) => updateField("year", e.target.value)}
-                >
-                  <option value="">Select Year</option>
-                  <option value="1st Year">1st Year</option>
-                  <option value="2nd Year">2nd Year</option>
-                  <option value="3rd Year">3rd Year</option>
-                  <option value="4th Year">4th Year</option>
-                </select>
-              )}
-            </div>
-
-            {/* Course */}
-            <div>
-              <span className={labelClass}>Course:</span>
-              {!editMode ? (
-                <p className={valueClass}>{memberObj.course}</p>
-              ) : (
+          <div className="bg-white rounded-xl border shadow-sm p-4">
+            <p className="text-xs uppercase text-gray-500">Course / Branch</p>
+            {editMode ? (
+              <div className="mt-2 space-y-2">
                 <input
                   type="text"
-                  className={inputClass}
-                  value={memberObj.course}
+                  className="w-full rounded-lg border px-3 py-2 text-sm text-gray-900"
+                  value={memberObj.course || ""}
                   onChange={(e) => updateField("course", e.target.value)}
+                  placeholder="Course"
                 />
-              )}
-            </div>
-
-            {/* Instagram */}
-            <div>
-              <span className={labelClass}>Instagram:</span>
-              {!editMode ? (
-                <p className={valueClass}>{memberObj.instagram || "N/A"}</p>
-              ) : (
                 <input
                   type="text"
-                  className={inputClass}
-                  value={memberObj.instagram}
-                  onChange={(e) => updateField("instagram", e.target.value)}
-                />
-              )}
-            </div>
-
-            {/* Bio */}
-            <div>
-              <span className={labelClass}>Bio:</span>
-              {!editMode ? (
-                <p className={valueClass}>{memberObj.bio || "N/A"}</p>
-              ) : (
-                <textarea
-                  className={inputClass}
-                  value={memberObj.bio}
-                  onChange={(e) => updateField("bio", e.target.value)}
-                />
-              )}
-            </div>
-
-            {/* Branch */}
-            <div>
-              <span className={labelClass}>Branch:</span>
-              {!editMode ? (
-                <p className={valueClass}>{memberObj.branch}</p>
-              ) : (
-                <input
-                  type="text"
-                  className={inputClass}
-                  value={memberObj.branch}
+                  className="w-full rounded-lg border px-3 py-2 text-sm text-gray-900"
+                  value={memberObj.branch || ""}
                   onChange={(e) => updateField("branch", e.target.value)}
+                  placeholder="Branch"
                 />
-              )}
+              </div>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-gray-900 mt-1">{displayCourse}</p>
+                <p className="text-sm text-gray-500">{displayBranch}</p>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Main Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-10 flex flex-col md:flex-row gap-12 border border-gray-100">
+          {/* Left - Image */}
+          <div className="w-full md:w-1/2 flex flex-col items-center gap-4">
+            <div className="relative">
+              <img
+                src={displayedImg}
+                alt={displayName}
+                className="w-60 h-60 object-cover rounded-2xl shadow-md border"
+              />
+              <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black text-white text-xs shadow">
+                {displayRole}
+              </span>
             </div>
 
-            {/* Roll */}
-            <div>
-              <span className={labelClass}>University Roll No:</span>
+            {editMode && (
+              <input
+                type="file"
+                accept="image/*"
+                className="mt-3 w-full border border-gray-300 p-2 rounded-lg"
+                onChange={(e) => setNewImage(e.target.files?.[0] || null)}
+              />
+            )}
+          </div>
+
+          {/* Right - Information */}
+          <div className="w-full md:w-1/2 space-y-6">
+            {/* Name + Role */}
+            <div className="space-y-2">
               {!editMode ? (
-                <p className={valueClass}>{memberObj.roll}</p>
+                <h2 className="text-3xl font-bold text-gray-900">{displayName}</h2>
               ) : (
                 <input
                   type="text"
-                  className={inputClass}
-                  value={memberObj.roll}
-                  onChange={(e) => updateField("roll", e.target.value)}
+                  value={memberObj.name || ""}
+                  onChange={(e) => updateField("name", e.target.value)}
+                  className={`${inputClass} text-2xl`}
+                  placeholder="Enter member name"
                 />
               )}
+
+              <p className="text-gray-600 text-lg">{displayRole}</p>
+            </div>
+
+            {/* Details list */}
+            <div className="space-y-3">
+              {[{
+                label: "Member ID",
+                render: () => <p className={valueClass}>{displayMemberId}</p>,
+              },
+              {
+                label: "Email",
+                render: () => <p className={valueClass}>{memberObj.email || "Not provided"}</p>,
+              },
+              {
+                label: "Achievement Points",
+                render: () => (!editMode ? (
+                  <p className={valueClass}>{displayPoints}</p>
+                ) : (
+                  <input
+                    type="number"
+                    className={inputClass}
+                    value={memberObj.points ?? ""}
+                    onChange={(e) => updateField("points", e.target.value)}
+                    placeholder="0"
+                  />
+                )),
+              },
+              {
+                label: "Birthday",
+                render: () => (!editMode ? (
+                  <p className={valueClass}>{memberObj.birthday || "N/A"}</p>
+                ) : (
+                  <input
+                    type="date"
+                    className={inputClass}
+                    max={today}
+                    value={birthdayValue}
+                    onChange={(e) => updateField("birthday", e.target.value)}
+                  />
+                )),
+              },
+              {
+                label: "College Year",
+                render: () => (!editMode ? (
+                  <p className={valueClass}>{displayYear}</p>
+                ) : (
+                  <select
+                    value={memberObj.year || ""}
+                    className={inputClass}
+                    onChange={(e) => updateField("year", e.target.value)}
+                  >
+                    <option value="">Select Year</option>
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                  </select>
+                )),
+              },
+              {
+                label: "Course",
+                render: () => (!editMode ? (
+                  <p className={valueClass}>{displayCourse}</p>
+                ) : (
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={memberObj.course || ""}
+                    onChange={(e) => updateField("course", e.target.value)}
+                    placeholder="Course"
+                  />
+                )),
+              },
+              {
+                label: "Instagram",
+                render: () => (!editMode ? (
+                  <p className={valueClass}>{memberObj.instagram || "N/A"}</p>
+                ) : (
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={memberObj.instagram || ""}
+                    onChange={(e) => updateField("instagram", e.target.value)}
+                    placeholder="@handle"
+                  />
+                )),
+              },
+              {
+                label: "Bio",
+                render: () => (!editMode ? (
+                  <p className={valueClass}>{memberObj.bio || "N/A"}</p>
+                ) : (
+                  <textarea
+                    className={inputClass}
+                    value={memberObj.bio || ""}
+                    onChange={(e) => updateField("bio", e.target.value)}
+                    placeholder="Short bio"
+                  />
+                )),
+              },
+              {
+                label: "Branch",
+                render: () => (!editMode ? (
+                  <p className={valueClass}>{displayBranch}</p>
+                ) : (
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={memberObj.branch || ""}
+                    onChange={(e) => updateField("branch", e.target.value)}
+                    placeholder="Branch"
+                  />
+                )),
+              },
+              {
+                label: "University Roll No",
+                render: () => (!editMode ? (
+                  <p className={valueClass}>{memberObj.roll || "N/A"}</p>
+                ) : (
+                  <input
+                    type="text"
+                    className={inputClass}
+                    value={memberObj.roll || ""}
+                    onChange={(e) => updateField("roll", e.target.value)}
+                    placeholder="Roll number"
+                  />
+                )),
+              }].map((row) => (
+                <div
+                  key={row.label}
+                  className="flex items-center justify-between gap-6 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3"
+                >
+                  <span className="text-sm uppercase tracking-wide text-gray-500">{row.label}</span>
+                  <div className="text-right w-1/2 sm:w-auto">{row.render()}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

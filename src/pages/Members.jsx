@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useMembers } from "../context/MembersContext";
@@ -12,10 +12,28 @@ export default function Members() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", role: "member", memberId: "", password: "" });
   const [imageFile, setImageFile] = useState(null);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("name");
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const filteredMembers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    const filtered = members.filter((m) => {
+      if (!query) return true;
+      const haystack = [m.name, m.role, m.email, m.memberId].filter(Boolean).join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+
+    return filtered.sort((a, b) => {
+      if (sortBy === "points") return (Number(b.points) || 0) - (Number(a.points) || 0);
+      if (sortBy === "recent") return (new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }, [members, search, sortBy]);
 
   const addMember = async (e) => {
     e.preventDefault();
@@ -27,6 +45,7 @@ export default function Members() {
 
     try {
       setBusyId("create");
+
       const payload = new FormData();
       payload.append("name", form.name);
       payload.append("email", form.email);
@@ -67,19 +86,40 @@ export default function Members() {
 
   return (
     <>
-    <div>
+    <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-200">
       {/* PAGE HEADER */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6 ">
         <h1 className="text-3xl font-bold">Members</h1>
 
-        {(user?.role === "superadmin" || user?.role === "admin") && (
-          <button
-            onClick={() => setShowAdd(true)}
-            className="px-4 py-2 bg-black text-white rounded-lg shadow hover:opacity-80 transition"
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto md:items-center">
+          <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2 shadow-sm w-full md:w-72">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full outline-none text-sm"
+              placeholder="Search by name, role, email..."
+            />
+          </div>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-white border rounded-lg px-3 py-2 shadow-sm text-sm"
           >
-            + Add Member
-          </button>
-        )}
+            <option value="name">Sort by Name (A-Z)</option>
+            <option value="points">Sort by Points</option>
+            <option value="recent">Sort by Recent</option>
+          </select>
+
+          {(user?.role === "superadmin" || user?.role === "admin") && (
+            <button
+              onClick={() => setShowAdd(true)}
+              className="px-4 py-2 bg-black text-white rounded-lg shadow hover:opacity-80 transition"
+            >
+              + Add Member
+            </button>
+          )}
+        </div>
       </div>
 
       {loading && <p className="text-gray-600">Loading members...</p>}
@@ -90,11 +130,11 @@ export default function Members() {
       )}
 
       {/* MEMBERS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-        {members.map((m) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8  p-4 rounded-xl">
+        {filteredMembers.map((m) => (
           <div
             key={m.id}
-            className="bg-white shadow-sm hover:shadow-lg p-4 rounded-xl transition relative"
+            className="bg-white border hover:shadow-lg p-4 rounded-xl transition relative"
           >
             {/* Link to Details */}
             <Link to={`/members/${m.id}`} state={{ m }}>
@@ -219,7 +259,7 @@ export default function Members() {
             onChange={(e) => setImageFile(e.target.files?.[0] || null)}
             className="w-full rounded-lg border p-2"
           />
-          <p className="text-xs text-gray-500 mt-1">Image is uploaded to Cloudinary via backend.</p>
+          <p className="text-xs text-gray-500 mt-1">Images upload to the backend (Cloudinary).</p>
         </div>
       </form>
     </Modal>

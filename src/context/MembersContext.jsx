@@ -50,7 +50,11 @@ export function MembersProvider({ children }) {
     const res = await api.updateMember(id, payload, token);
     const updated = normalizeMember(res?.member || res);
     setMembers((prev) =>
-      prev.map((m) => (sameMember(m, id) ? { ...m, ...updated } : m))
+      prev.map((m) => {
+        if (!sameMember(m, id)) return m;
+        const nextImg = updated?.img || m.img; // preserve existing image if backend omits it
+        return { ...m, ...updated, img: nextImg };
+      })
     );
     return updated;
   };

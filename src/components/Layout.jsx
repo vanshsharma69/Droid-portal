@@ -1,12 +1,16 @@
 import { Menu, Bell, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 export default function Layout({ children }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const { logout, user } = useAuth();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [location.pathname]);
 
   const navItems = [
     { name: "Dashboard", path: "/dashboard" },

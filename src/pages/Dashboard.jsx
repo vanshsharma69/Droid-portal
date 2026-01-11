@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useMembers } from "../context/MembersContext";
 import { useProjects } from "../context/ProjectsContext";
 import { useEvents } from "../context/EventsContext";
@@ -5,6 +6,7 @@ import { useAttendance } from "../context/AttendanceContext";
 import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
+  const [monthDate, setMonthDate] = useState(() => new Date());
   const { user } = useAuth();
   const { members, loading: membersLoading } = useMembers();
   const { projects, loading: projectsLoading } = useProjects();
@@ -20,19 +22,48 @@ export default function Dashboard() {
   );
 
   const welcomeName = currentMember?.name || user?.name || user?.email || "there";
+  const userRole = currentMember?.role || user?.role || "Member";
 
   const totalMembers = members.length;
   const totalProjects = projects.length;
   const totalEvents = events.length;
 
-  const avgAttendance = (() => {
-    const totalDays = daily.length;
-    const presentDays = daily.filter((a) => a.present).length;
-    if (totalDays === 0) return 0;
-    return Math.round((presentDays / totalDays) * 100);
-  })();
+  const birthdaysByDay = useMemo(() => {
+    const map = {};
+    members.forEach((m) => {
+      if (!m?.birthday) return;
+      const d = new Date(m.birthday);
+      if (Number.isNaN(d.getTime())) return;
+      if (d.getMonth() !== monthDate.getMonth()) return;
+      const day = d.getDate();
+      if (!map[day]) map[day] = [];
+      map[day].push(m.name || "Member");
+    });
+    return map;
+  }, [members, monthDate]);
 
-  const topMember = [...members].sort((a, b) => (b.points || 0) - (a.points || 0))[0];
+  const calendarDays = useMemo(() => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < firstDay; i += 1) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day += 1) cells.push(day);
+    return cells;
+  }, [monthDate]);
+
+  const goMonth = (delta) => {
+    setMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+  };
+
+  const today = new Date();
+
+  const topMembers = useMemo(
+    () => [...members].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 7),
+    [members]
+  );
+  const topMember = topMembers[0];
   const upcomingEvents = [...events]
     .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))
     .slice(0, 3);
@@ -40,7 +71,7 @@ export default function Dashboard() {
   return (
     <div className="text-black">
       <h1 className="text-3xl font-bold">Dashboard</h1>
-      <p className="text-gray-700 mt-2">Welcome back, {welcomeName}</p>
+      <p className="text-gray-700 mt-2 text-xl">Welcome back, <span className="text-red-500">{welcomeName} </span></p>
 
       {/* STAT CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
@@ -63,11 +94,124 @@ export default function Dashboard() {
           <h2 className="text-3xl font-bold mt-2">{totalEvents}</h2>
         </div>
 
-        {/* Attendance */}
+        {/* You */}
         <div className="bg-white p-5 shadow rounded-xl border">
-          <p className="text-gray-500">Avg Attendance</p>
-          <h2 className="text-3xl font-bold mt-2">{avgAttendance}%</h2>
+          <p className="text-gray-500">Logged in as</p>
+          <h2 className="text-2xl font-bold mt-2 truncate">{welcomeName}</h2>
+          <p className="text-sm text-gray-600 mt-1">{userRole}</p>
         </div>
+      </div>
+
+      <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Top Members (fills height) */}
+        <div className="bg-white p-6 rounded-xl shadow border flex flex-col h-full">
+          <h2 className="text-2xl font-semibold mb-4">Top Members</h2>
+          {topMembers.length === 0 ? (
+            <p className="text-gray-600">No members available.</p>
+          ) : (
+            <div className="flex flex-col divide-y divide-gray-100">
+              {topMembers.map((m, idx) => (
+                <div key={m.id} className="flex items-center gap-4 py-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-700 font-semibold">
+                    {idx + 1}
+                  </div>
+                  <img src={m.img} className="w-14 h-14 rounded-full object-cover shadow" />
+                  <div className="flex-1">
+                    <p className="text-lg font-semibold text-gray-900">{m.name}</p>
+                    <p className="text-sm text-gray-600">{m.role}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">Points</p>
+                    <p className="text-lg font-semibold text-gray-900">{m.points}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Birthday Calendar (right on desktop) */}
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow border">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold">Birthdays Calendar</h2>
+              <p className="text-gray-600">Switch months to see upcoming birthdays.</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Today: {today.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => goMonth(-1)}
+                className="px-3 py-2 rounded-lg border bg-gray-50 hover:bg-gray-100 text-sm"
+                type="button"
+              >
+                Prev
+              </button>
+              <div className="px-3 py-2 rounded-lg border bg-gray-50 text-gray-800 font-semibold text-sm sm:text-base text-center">
+                {monthDate.toLocaleDateString(undefined, { year: "numeric", month: "long" })}
+              </div>
+              <button
+                onClick={() => goMonth(1)}
+                className="px-3 py-2 rounded-lg border bg-gray-50 hover:bg-gray-100 text-sm"
+                type="button"
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setMonthDate(new Date())}
+                className="px-3 py-2 rounded-lg border bg-black text-white hover:bg-gray-900 text-sm"
+                type="button"
+              >
+                Today
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-7 gap-1 sm:gap-3 text-center text-xs sm:text-sm font-semibold text-gray-600">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="uppercase tracking-wide">{d}</div>
+            ))}
+          </div>
+
+          <div className="mt-2 grid grid-cols-7 gap-1 sm:gap-3 text-[11px] sm:text-xs">
+            {calendarDays.map((day, idx) => {
+              if (!day) {
+                return <div key={`empty-${idx}`} className="h-24 rounded-xl border border-dashed border-gray-200" />;
+              }
+
+              const isToday =
+                day === today.getDate() &&
+                monthDate.getMonth() === today.getMonth() &&
+                monthDate.getFullYear() === today.getFullYear();
+
+              const birthdays = birthdaysByDay[day] || [];
+
+              return (
+                <div
+                  key={day}
+                  className={`h-20 sm:h-24 rounded-xl border p-2 text-left flex flex-col gap-1 ${
+                    isToday ? "border-black shadow bg-black text-white" : "border-gray-200"
+                  }`}
+                >
+                  <div className={`text-xs sm:text-sm font-semibold ${isToday ? "bg-black text-white" : "text-gray-700"}`}>
+                    {day}
+                  </div>
+                  {birthdays.length === 0 ? (
+                    <span className="text-[10px] sm:text-xs text-gray-400"></span>
+                  ) : (
+                    birthdays.map((name) => (
+                      <span key={`${day}-${name}`} className="text-[10px] sm:text-xs font-medium text-indigo-700 truncate">
+                        🎂 {name}
+                      </span>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
       </div>
 
       {(membersLoading || projectsLoading || eventsLoading || attendanceLoading) && (
@@ -76,28 +220,6 @@ export default function Dashboard() {
       {(eventsError || attendanceError) && (
         <p className="text-red-600 mt-2">{eventsError || attendanceError}</p>
       )}
-
-      {/* TOP MEMBER */}
-      <div className="mt-10 bg-white p-6 rounded-xl shadow border">
-        <h2 className="text-2xl font-semibold mb-4">Top Member</h2>
-        {topMember ? (
-          <div className="flex items-center gap-6">
-            <img
-              src={topMember.img}
-              className="w-20 h-20 rounded-full object-cover shadow"
-            />
-            <div>
-              <p className="text-xl font-bold">{topMember.name}</p>
-              <p className="text-gray-600">{topMember.role}</p>
-              <p className="mt-1 text-gray-700">
-                Points: <span className="font-semibold">{topMember.points}</span>
-              </p>
-            </div>
-          </div>
-        ) : (
-          <p className="text-gray-600">No members available.</p>
-        )}
-      </div>
 
       {/* UPCOMING EVENTS */}
       <div className="mt-10 bg-white p-6 rounded-xl shadow border">
