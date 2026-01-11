@@ -2,12 +2,24 @@ import { useMembers } from "../context/MembersContext";
 import { useProjects } from "../context/ProjectsContext";
 import { useEvents } from "../context/EventsContext";
 import { useAttendance } from "../context/AttendanceContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const { members, loading: membersLoading } = useMembers();
   const { projects, loading: projectsLoading } = useProjects();
   const { events, loading: eventsLoading, error: eventsError } = useEvents();
   const { daily, loading: attendanceLoading, error: attendanceError } = useAttendance();
+
+  const currentMember = members.find(
+    (m) =>
+      m?.id === user?.memberId ||
+      m?.memberId === user?.memberId ||
+      m?.id === user?.id ||
+      m?.memberId === user?.id
+  );
+
+  const welcomeName = currentMember?.name || user?.name || user?.email || "there";
 
   const totalMembers = members.length;
   const totalProjects = projects.length;
@@ -28,7 +40,7 @@ export default function Dashboard() {
   return (
     <div className="text-black">
       <h1 className="text-3xl font-bold">Dashboard</h1>
-      <p className="text-gray-700 mt-2">Welcome to Droid Club Management Portal</p>
+      <p className="text-gray-700 mt-2">Welcome back, {welcomeName}</p>
 
       {/* STAT CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
