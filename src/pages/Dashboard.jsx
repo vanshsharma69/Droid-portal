@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMembers } from "../context/MembersContext";
 import { useProjects } from "../context/ProjectsContext";
 import { useEvents } from "../context/EventsContext";
@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
   const [monthDate, setMonthDate] = useState(() => new Date());
+  const [selectedDay, setSelectedDay] = useState(null);
   const { user } = useAuth();
   const { members, loading: membersLoading } = useMembers();
   const { projects, loading: projectsLoading } = useProjects();
@@ -52,6 +53,24 @@ export default function Dashboard() {
     for (let day = 1; day <= daysInMonth; day += 1) cells.push(day);
     return cells;
   }, [monthDate]);
+
+  // Clear any selected day when the month changes
+  useEffect(() => {
+    setSelectedDay(null);
+  }, [monthDate]);
+
+  const selectedBirthdays = selectedDay ? birthdaysByDay[selectedDay] || [] : [];
+  const selectedDateLabel = useMemo(() => {
+    if (!selectedDay) return "";
+    return new Date(monthDate.getFullYear(), monthDate.getMonth(), selectedDay).toLocaleDateString(
+      undefined,
+      { year: "numeric", month: "long", day: "numeric" }
+    );
+  }, [selectedDay, monthDate]);
+
+  const handleDayClick = (day) => {
+    setSelectedDay(day);
+  };
 
   const goMonth = (delta) => {
     setMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
@@ -187,12 +206,18 @@ export default function Dashboard() {
 
               const birthdays = birthdaysByDay[day] || [];
 
+              const isSelected = selectedDay === day;
+
               return (
-                <div
+                <button
                   key={day}
-                  className={`h-20 sm:h-24 rounded-xl border p-2 text-left flex flex-col gap-1 ${
-                    isToday ? "border-black shadow bg-black text-white" : "border-gray-200"
-                  }`}
+                  type="button"
+                  onClick={() => handleDayClick(day)}
+                  className={`h-20 sm:h-24 rounded-xl border p-2 text-left flex flex-col gap-1 transition
+                    ${isToday ? "border-black shadow bg-black text-white" : "border-gray-200"}
+                    ${isSelected && !isToday ? "ring-2 ring-black" : ""}
+                    ${birthdays.length > 0 ? "hover:border-black hover:shadow" : "hover:border-gray-300"}
+                  `}
                 >
                   <div className={`text-xs sm:text-sm font-semibold ${isToday ? "bg-black text-white" : "text-gray-700"}`}>
                     {day}
@@ -206,9 +231,37 @@ export default function Dashboard() {
                       </span>
                     ))
                   )}
-                </div>
+                </button>
               );
             })}
+          </div>
+
+          {/* Birthday detail for selected day */}
+          <div className="mt-4 rounded-xl border bg-gray-50 p-4">
+            {selectedDay ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-800">{selectedDateLabel}</p>
+                  <span className="text-xs px-2 py-1 rounded-full bg-white border text-gray-700">
+                    {selectedBirthdays.length} birthday{selectedBirthdays.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                {selectedBirthdays.length === 0 ? (
+                  <p className="text-sm text-gray-600">No birthdays on this date.</p>
+                ) : (
+                  <ul className="space-y-1 text-sm text-gray-800">
+                    {selectedBirthdays.map((name) => (
+                      <li key={`${selectedDay}-${name}`} className="flex items-center gap-2">
+                        <span className="text-lg">🎂</span>
+                        <span>{name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">Tap a date to see whose birthday it is.</p>
+            )}
           </div>
         </div>
 

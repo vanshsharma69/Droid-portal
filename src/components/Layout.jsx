@@ -11,6 +11,16 @@ export default function Layout({ children }) {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [location.pathname]);
+  
+  useEffect(() => {
+    const body = document.body;
+    if (open) {
+      body.classList.add("overflow-hidden");
+    } else {
+      body.classList.remove("overflow-hidden");
+    }
+    return () => body.classList.remove("overflow-hidden");
+  }, [open]);
 
   const navItems = [
     { name: "Dashboard", path: "/dashboard" },
@@ -28,7 +38,7 @@ export default function Layout({ children }) {
       <div
         className={`fixed md:static top-0 left-0 h-screen w-64 bg-white border-r border-gray-200 shadow-md
         flex flex-col justify-between 
-        transform transition-transform duration-300 ease-in-out
+        transform transition-transform duration-300 ease-in-out z-50
         ${open ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
 
@@ -81,8 +91,16 @@ export default function Layout({ children }) {
 
       </div>
 
+      {/* Mobile Overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/40 md:hidden z-40"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
       {/* MAIN CONTENT */}
-      <div className="flex-1 h-screen overflow-y-auto bg-gray-100">
+      <div className="flex-1 h-screen overflow-y-auto bg-gray-100 relative">
 
         {/* Mobile Topbar */}
         <div className="md:hidden flex items-center justify-between border-b border-gray-200 p-4 bg-white shadow-sm">

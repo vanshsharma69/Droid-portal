@@ -4,7 +4,24 @@ import { useMembers } from "../context/MembersContext";
 export default function Leaderboard() {
   const { members, loading, error } = useMembers();
 
-  const sorted = [...members].sort((a, b) => (b.points || 0) - (a.points || 0));
+  // Stable sort by points desc, then name asc for deterministic ties
+  const sorted = [...members].sort((a, b) => {
+    const diff = (b.points || 0) - (a.points || 0);
+    if (diff !== 0) return diff;
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
+
+  // Assign competition ranks: equal points share the same rank number
+  const ranked = [];
+  let lastPoints = null;
+  let lastRank = 0;
+  sorted.forEach((m, idx) => {
+    const pts = m.points || 0;
+    const rank = pts === lastPoints ? lastRank : idx + 1;
+    ranked.push({ ...m, rank });
+    lastPoints = pts;
+    lastRank = rank;
+  });
 
   // Rank colors
   const rankStyles = {
@@ -22,8 +39,8 @@ export default function Leaderboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 
-        {sorted.map((m, index) => {
-          const rank = index + 1;
+        {ranked.map((m) => {
+          const rank = m.rank;
 
           return (
             <div
