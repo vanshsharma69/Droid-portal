@@ -114,9 +114,12 @@ export default function EventDetails() {
   };
 
   const toggleAttendance = async (rec) => {
+    const attId = rec.id ?? rec._id;
+    if (!attId) return alert("Invalid attendance record");
+
     setBusy(true);
     try {
-      await updateEventAtt(rec.id, {
+      await updateEventAtt(attId, {
         attended: !rec.attended,
       });
     } catch {
@@ -129,9 +132,12 @@ export default function EventDetails() {
   const removeMember = async (rec) => {
     if (!confirm("Remove this member?")) return;
 
+    const attId = rec.id ?? rec._id;
+    if (!attId) return alert("Invalid attendance record");
+
     setBusy(true);
     try {
-      await deleteEventAtt(rec.id);
+      await deleteEventAtt(attId);
     } catch {
       alert("Failed to remove member");
     } finally {
