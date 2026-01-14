@@ -159,7 +159,7 @@ export default function AttendanceDetails() {
         <ul className="space-y-2">
           {memberDaily.map((d, i) => (
             <li key={d.id || i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
-              <span>{d.date}</span>
+              <span>{new Date(d.date).toLocaleDateString()}</span>
 
               <div className="flex items-center gap-3">
                 <span className={d.present ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
