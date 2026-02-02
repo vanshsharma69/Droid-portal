@@ -4,6 +4,7 @@ import { useProjects } from "../context/ProjectsContext";
 import { useEvents } from "../context/EventsContext";
 import { useAttendance } from "../context/AttendanceContext";
 import { useAuth } from "../context/AuthContext";
+import { formatDate } from "../utils/date";
 
 export default function Dashboard() {
   const [monthDate, setMonthDate] = useState(() => new Date());
@@ -62,10 +63,9 @@ export default function Dashboard() {
   const selectedBirthdays = selectedDay ? birthdaysByDay[selectedDay] || [] : [];
   const selectedDateLabel = useMemo(() => {
     if (!selectedDay) return "";
-    return new Date(monthDate.getFullYear(), monthDate.getMonth(), selectedDay).toLocaleDateString(
-      undefined,
-      { year: "numeric", month: "long", day: "numeric" }
-    );
+    return formatDate(new Date(monthDate.getFullYear(), monthDate.getMonth(), selectedDay), {
+      formatOptions: { year: "numeric", month: "long", day: "numeric" },
+    });
   }, [selectedDay, monthDate]);
 
   const handleDayClick = (day) => {
@@ -156,7 +156,7 @@ export default function Dashboard() {
               <h2 className="text-2xl font-semibold">Birthdays Calendar</h2>
               <p className="text-gray-600">Switch months to see upcoming birthdays.</p>
               <p className="text-sm text-gray-500 mt-1">
-                Today: {today.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+                Today: {formatDate(today, { formatOptions: { year: "numeric", month: "long", day: "numeric" } })}
               </p>
             </div>
             <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3">
@@ -168,7 +168,7 @@ export default function Dashboard() {
                 Prev
               </button>
               <div className="px-3 py-2 rounded-lg border bg-gray-50 text-gray-800 font-semibold text-sm sm:text-base text-center">
-                {monthDate.toLocaleDateString(undefined, { year: "numeric", month: "long" })}
+                {formatDate(monthDate, { formatOptions: { year: "numeric", month: "long" } })}
               </div>
               <button
                 onClick={() => goMonth(1)}
@@ -288,7 +288,7 @@ export default function Dashboard() {
                 className="flex justify-between p-4 border rounded-lg bg-gray-50"
               >
                 <span className="font-semibold">{e.name}</span>
-                <span className="text-gray-600">{e.date}</span>
+                <span className="text-gray-600">{formatDate(e.date)}</span>
               </li>
             ))}
           </ul>

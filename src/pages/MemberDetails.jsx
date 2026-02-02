@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useMembers } from "../context/MembersContext";
+import { formatDate } from "../utils/date";
 
 const normalizeMember = (m) => {
   if (!m) return m;
@@ -379,7 +380,7 @@ export default function MemberDetails() {
               {
                 label: "Birthday",
                 render: () => (!editMode ? (
-                  <p className={valueClass}>{memberObj.birthday || "N/A"}</p>
+                  <p className={valueClass}>{formatDate(memberObj.birthday)}</p>
                 ) : (
                   <input
                     type="date"

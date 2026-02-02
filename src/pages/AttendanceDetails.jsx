@@ -4,6 +4,7 @@ import { useState } from "react";
 import Modal from "../components/Modal";
 import { useAttendance } from "../context/AttendanceContext";
 import { useEvents } from "../context/EventsContext";
+import { formatDate } from "../utils/date";
 
 const normalizeMember = (m) => {
   if (!m) return m;
@@ -159,7 +160,7 @@ export default function AttendanceDetails() {
         <ul className="space-y-2">
           {memberDaily.map((d, i) => (
             <li key={d.id || i} className="flex justify-between items-center p-3 bg-gray-50 border rounded">
-              <span>{new Date(d.date).toLocaleDateString()}</span>
+              <span>{formatDate(d.date)}</span>
 
               <div className="flex items-center gap-3">
                 <span className={d.present ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>

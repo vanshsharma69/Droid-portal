@@ -6,6 +6,7 @@ import { useEvents } from "../context/EventsContext";
 import { useAttendance } from "../context/AttendanceContext";
 import { useAuth } from "../context/AuthContext";
 import Modal from "../components/Modal";
+import { formatDate } from "../utils/date";
 
 export default function Events() {
   const { user } = useAuth();
@@ -127,7 +128,7 @@ export default function Events() {
 
                   <p>
                     <span className="font-semibold">Date:</span>{" "}
-                    {ev.date ? new Date(ev.date).toLocaleDateString() : "N/A"}
+                    {formatDate(ev.date)}
                   </p>
 
                   <p>

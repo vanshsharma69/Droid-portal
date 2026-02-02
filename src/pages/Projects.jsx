@@ -5,6 +5,7 @@ import { useProjects } from "../context/ProjectsContext";
 import { useMembers } from "../context/MembersContext";
 import { useAuth } from "../context/AuthContext";
 import Modal from "../components/Modal";
+import { formatDate } from "../utils/date";
 
 export default function Projects() {
   const { user } = useAuth();
@@ -93,7 +94,7 @@ export default function Projects() {
                   <Clock className="w-4 h-4" />
                   <span className="text-sm">
                     Deadline: {""}
-                    <span className="font-semibold text-black">{p.deadline || "N/A"}</span>
+                    <span className="font-semibold text-black">{formatDate(p.deadline)}</span>
                   </span>
                 </div>
 

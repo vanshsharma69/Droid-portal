@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useProjects } from "../context/ProjectsContext";
 import { useMembers } from "../context/MembersContext";
+import { formatDate } from "../utils/date";
 
 export default function ProjectDetails() {
   const { state } = useLocation();
@@ -185,7 +186,7 @@ export default function ProjectDetails() {
           <p>
             <span className="font-semibold">Deadline:</span>{" "}
             {!editMode ? (
-              project.deadline || "Not set"
+              formatDate(project.deadline, { fallback: "Not set" })
             ) : (
               <input
                 type="date"
