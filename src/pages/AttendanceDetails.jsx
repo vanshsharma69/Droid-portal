@@ -125,7 +125,7 @@ export default function AttendanceDetails() {
 
       {/* MEMBER CARD */}
       <div className="flex flex-col md:flex-row items-center gap-8 bg-white p-6 shadow rounded-lg mb-10">
-        <img src={member.img} alt={member.name} className="w-36 h-36 rounded-full shadow" />
+        <img src={member.img} alt={member.name} className="w-36 h-36 rounded-full shadow object-contain" />
 
         <div>
           <h2 className="text-2xl font-bold">{member.name}</h2>
