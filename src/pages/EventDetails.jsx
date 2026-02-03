@@ -74,10 +74,14 @@ export default function EventDetails() {
       .filter((ea) => ea.member);
   }, [eventAttendance, members, eventId]);
 
-  const availableMembers = members.filter((m) => {
-    const mid = Number(m.memberId ?? m.id);
-    return !assigned.some((rec) => Number(rec.memberId) === mid);
-  });
+  const availableMembers = useMemo(() => {
+    const list = members.filter((m) => {
+      const mid = Number(m.memberId ?? m.id);
+      return !assigned.some((rec) => Number(rec.memberId) === mid);
+    });
+
+    return list.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [members, assigned]);
 
   if (!event && !error) {
     return <h1 className="text-xl font-bold mt-10 text-center">Loading event...</h1>;

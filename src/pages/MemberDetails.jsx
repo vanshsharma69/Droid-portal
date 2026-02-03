@@ -85,22 +85,33 @@ export default function MemberDetails() {
 
     try {
       const memberIdValue = Number(memberObj.memberId);
+      const common = {
+        name: memberObj.name || "",
+        role: memberObj.role || "",
+        email: memberObj.email,
+        points: memberObj.points,
+        birthday: memberObj.birthday,
+        year: memberObj.year,
+        course: memberObj.course,
+        instagram: memberObj.instagram,
+        bio: memberObj.bio,
+        branch: memberObj.branch,
+        roll: memberObj.roll,
+      };
 
-      const payload = new FormData();
-      payload.append("name", memberObj.name || "");
-      payload.append("role", memberObj.role || "");
-      if (memberObj.email) payload.append("email", memberObj.email);
-      if (memberObj.points !== undefined) payload.append("points", memberObj.points);
-      if (memberObj.birthday) payload.append("birthday", memberObj.birthday);
-      if (memberObj.year) payload.append("year", memberObj.year);
-      if (memberObj.course) payload.append("course", memberObj.course);
-      if (memberObj.instagram) payload.append("instagram", memberObj.instagram);
-      if (memberObj.bio) payload.append("bio", memberObj.bio);
-      if (memberObj.branch) payload.append("branch", memberObj.branch);
-      if (memberObj.roll) payload.append("roll", memberObj.roll);
-      if (!Number.isNaN(memberIdValue)) payload.append("memberId", memberIdValue);
+      if (!Number.isNaN(memberIdValue)) {
+        common.memberId = memberIdValue;
+      }
 
-      if (newImage) {
+      const hasNewImage = Boolean(newImage);
+      const payload = hasNewImage ? new FormData() : common;
+
+      if (hasNewImage) {
+        Object.entries(common).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            payload.append(key, value);
+          }
+        });
         payload.append("img", newImage);
       }
 
@@ -350,7 +361,17 @@ export default function MemberDetails() {
                 />
               )}
 
-              <p className="text-gray-600 text-lg">{displayRole}</p>
+              {!editMode ? (
+                <p className="text-gray-600 text-lg">{displayRole}</p>
+              ) : (
+                <input
+                  type="text"
+                  value={memberObj.role || ""}
+                  onChange={(e) => updateField("role", e.target.value)}
+                  className={`${inputClass} text-lg`}
+                  placeholder="Role / Position (e.g., President, Web Dev Head)"
+                />
+              )}
             </div>
 
             {/* Details list */}

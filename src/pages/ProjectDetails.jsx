@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useProjects } from "../context/ProjectsContext";
@@ -55,11 +55,15 @@ export default function ProjectDetails() {
     .map((idVal) => members.find((m) => normalizeMemberId(m) === idVal))
     .filter(Boolean);
 
-  const availableMembers = members.filter((m) => {
-    const mid = normalizeMemberId(m);
-    if (mid === null) return false;
-    return !assignedIds.some((idVal) => idVal === mid);
-  });
+  const availableMembers = useMemo(() => {
+    const list = members.filter((m) => {
+      const mid = normalizeMemberId(m);
+      if (mid === null) return false;
+      return !assignedIds.some((idVal) => idVal === mid);
+    });
+
+    return list.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [members, assignedIds]);
 
   const updateField = (field, value) => {
     setProject({ ...project, [field]: value });
