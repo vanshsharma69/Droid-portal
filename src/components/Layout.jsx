@@ -80,6 +80,7 @@ export default function Layout({ children }) {
 
         {/* BOTTOM LOGOUT BUTTON */}
         <div className="p-4 border-t border-gray-200">
+        <p className="mb-4 text-sm py-4 px-2">made with ❤️ by <a className="underline text-blue-500" target="_blank" href="https://linkedin.com/in/vansh-sharma-sde">Vansh Sharma</a></p>
           <button
             onClick={logout}
             className="w-full p-3 rounded-md bg-red-50 text-red-600 font-medium 
