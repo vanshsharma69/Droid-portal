@@ -17,6 +17,11 @@ export default function Attendance() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");
 
+  const sortedMembers = useMemo(
+    () => [...members].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    [members]
+  );
+
   const attendanceView = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -203,7 +208,7 @@ export default function Attendance() {
           <div>
             <label className="block text-sm font-medium text-gray-700">Members</label>
             <div className="max-h-48 overflow-auto border rounded-lg p-3 space-y-2">
-              {members.map((m) => {
+              {sortedMembers.map((m) => {
                 const idStr = String(m.memberId ?? m.id);
                 const checked = selectedMembers.includes(idStr);
                 return (

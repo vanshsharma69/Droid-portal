@@ -9,8 +9,8 @@ export default function Login() {
 
   const statePrefill = location.state || {};
 
-  const [email, setEmail] = useState(statePrefill.email || "aditya@droid.com");
-  const [password, setPassword] = useState(statePrefill.password || "Aditya@droid123");
+  const [email, setEmail] = useState(statePrefill.email || "");
+  const [password, setPassword] = useState(statePrefill.password || "");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -96,7 +96,7 @@ export default function Login() {
                 <input
                   type="email"
                   className="w-full p-3 border rounded-lg bg-gray-50"
-                  placeholder="aditya@droid.com"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -107,7 +107,7 @@ export default function Login() {
                 <input
                   type="password"
                   className="w-full p-3 border rounded-lg bg-gray-50"
-                  placeholder="Aditya@droid123"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
